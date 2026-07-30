@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  ps-radar — server
+--  lsn-radar — server
 -- ═══════════════════════════════════════════════════════════════════════════
 -- The radar itself is entirely client side: it reads entities the client can
 -- already see, and nothing it computes needs to be trusted. What the server is
@@ -66,7 +66,7 @@ end
 -- hits rather than on every scan. Duplicating any of that here would mean two
 -- systems disagreeing about what an officer has already been told.
 
-RegisterNetEvent('ps-radar:server:checkPlate', function(cam, plate, plateIndex, coords)
+RegisterNetEvent('lsn-radar:server:checkPlate', function(cam, plate, plateIndex, coords)
     local src = source
     if cam ~= 'front' and cam ~= 'rear' then return end
     if type(plate) ~= 'string' or #plate > 8 then return end
@@ -98,7 +98,7 @@ RegisterNetEvent('ps-radar:server:checkPlate', function(cam, plate, plateIndex, 
         -- telling the reader the car came back clear.
         if result.denied then return end
 
-        TriggerClientEvent('ps-radar:client:plateResult', src, cam, plate, result.hits or {}, result.severity)
+        TriggerClientEvent('lsn-radar:client:plateResult', src, cam, plate, result.hits or {}, result.severity)
     end)
 end)
 
@@ -106,25 +106,25 @@ end)
 -- Named to match the shape server owners already know from the resource this
 -- one is modelled on, so existing integration snippets need only a rename.
 
-RegisterNetEvent('ps-radar:server:plateScanned', function(cam, plate, index)
+RegisterNetEvent('lsn-radar:server:plateScanned', function(cam, plate, index)
     local src = source
     if type(plate) ~= 'string' or #plate > 8 then return end
     if not allow(src, 'scan', 200) then return end
     if not isOfficer(src) then return end
 
-    TriggerEvent('ps-radar:onPlateScanned', src, cam, plate, index)
+    TriggerEvent('lsn-radar:onPlateScanned', src, cam, plate, index)
 end)
 
-RegisterNetEvent('ps-radar:server:plateLocked', function(cam, plate, index)
+RegisterNetEvent('lsn-radar:server:plateLocked', function(cam, plate, index)
     local src = source
     if type(plate) ~= 'string' or #plate > 8 then return end
     if not allow(src, 'lock', 200) then return end
     if not isOfficer(src) then return end
 
-    TriggerEvent('ps-radar:onPlateLocked', src, cam, plate, index)
+    TriggerEvent('lsn-radar:onPlateLocked', src, cam, plate, index)
 end)
 
-RegisterNetEvent('ps-radar:server:speedLocked', function(speed, unit, plate)
+RegisterNetEvent('lsn-radar:server:speedLocked', function(speed, unit, plate)
     local src = source
     speed = tonumber(speed)
     if not speed then return end
@@ -135,7 +135,7 @@ RegisterNetEvent('ps-radar:server:speedLocked', function(speed, unit, plate)
     -- because ps-dispatch's CustomAlert is a client export — routing it through
     -- here would mean rebuilding the coords, street and gender lookup that
     -- CustomAlert already does on the client that has them.
-    TriggerEvent('ps-radar:onSpeedLocked', src, speed, unit, plate)
+    TriggerEvent('lsn-radar:onSpeedLocked', src, speed, unit, plate)
 end)
 
 -- ── Exports ───────────────────────────────────────────────────────────────
@@ -146,7 +146,7 @@ end)
 ---@param beep boolean|nil
 exports('TogglePlateLock', function(clientId, cam, beep)
     if cam ~= 'front' and cam ~= 'rear' then return false end
-    TriggerClientEvent('ps-radar:client:lockCamera', clientId, cam, beep)
+    TriggerClientEvent('lsn-radar:client:lockCamera', clientId, cam, beep)
     return true
 end)
 
@@ -155,11 +155,11 @@ end)
 ---@param clientId number
 ---@param plate string
 exports('SetBolo', function(clientId, plate)
-    TriggerClientEvent('ps-radar:client:setBolo', clientId, plate)
+    TriggerClientEvent('lsn-radar:client:setBolo', clientId, plate)
 end)
 
 --- Open a unit's control panel from elsewhere.
 ---@param clientId number
 exports('OpenRemote', function(clientId)
-    TriggerClientEvent('ps-radar:client:openRemote', clientId)
+    TriggerClientEvent('lsn-radar:client:openRemote', clientId)
 end)

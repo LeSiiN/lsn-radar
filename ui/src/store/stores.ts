@@ -3,7 +3,7 @@ import type { RadarData, PlateData, SettingsPayload } from "@typings/type";
 import { isEnvBrowser } from "@utils/misc";
 
 export const BROWSER_MODE = writable<boolean>(isEnvBrowser());
-export const RESOURCE_NAME = writable<string>("ps-radar");
+export const RESOURCE_NAME = writable<string>("lsn-radar");
 
 /** Whether the panel is on screen at all — driven by the vehicle watch. */
 export const SHOW_RADAR = writable<boolean>(false);

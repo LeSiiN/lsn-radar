@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  ps-radar — configuration
+--  lsn-radar — configuration
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Everything an operator can change lives in the operator menu and is stored
 -- per client (KVP). Everything a server owner decides lives here.

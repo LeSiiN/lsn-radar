@@ -6,7 +6,7 @@
   import { SendNUI } from "@utils/SendNUI";
   import { onMount } from "svelte";
 
-  $RESOURCE_NAME = "ps-radar";
+  $RESOURCE_NAME = "lsn-radar";
 
   onMount(() => {
     const onKey = (e: KeyboardEvent) => {

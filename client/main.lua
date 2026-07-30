@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
---  ps-radar — client
+--  lsn-radar — client
 -- ═══════════════════════════════════════════════════════════════════════════
 -- State, the NUI bridge, keybinds and the exports other resources hook into.
 --
@@ -607,16 +607,16 @@ exports('GetLockedSpeeds', function()
     }
 end)
 
-RegisterNetEvent('ps-radar:client:setBolo', function(plate)
+RegisterNetEvent('lsn-radar:client:setBolo', function(plate)
     SetBoloPlate(plate)
 end)
 
-RegisterNetEvent('ps-radar:client:lockCamera', function(cam, beep)
+RegisterNetEvent('lsn-radar:client:lockCamera', function(cam, beep)
     if cam ~= 'front' and cam ~= 'rear' then return end
     TogglePlateLock(cam, true, not beep)
 end)
 
-RegisterNetEvent('ps-radar:client:openRemote', function()
+RegisterNetEvent('lsn-radar:client:openRemote', function()
     OpenRemote()
 end)
 

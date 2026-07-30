@@ -1,0 +1,8 @@
+# Dependencies
+/ui/node_modules
+/ui/dist
+
+# Editor
+.vscode/
+.cursor/
+.idea/

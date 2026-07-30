@@ -143,7 +143,7 @@ function LockAntenna(antenna, target, source, auto)
 
     if not auto then return end
 
-    TriggerServerEvent('ps-radar:server:speedLocked', target.speed, RadarState.unit, target.plate or '')
+    TriggerServerEvent('lsn-radar:server:speedLocked', target.speed, RadarState.unit, target.plate or '')
 
     -- ps-dispatch's CustomAlert is a client export taking one table, so the
     -- alert originates here rather than on the server. Wrapped because a

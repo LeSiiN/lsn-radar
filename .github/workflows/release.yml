@@ -133,7 +133,7 @@ jobs:
       - name: Stage release files
         run: |
           set -euo pipefail
-          STAGE_DIR="release-stage/ps-radar"
+          STAGE_DIR="release-stage/lsn-radar"
           mkdir -p "${STAGE_DIR}"
 
           # Pflicht — fehlt eines davon, soll das Release scheitern.
@@ -160,8 +160,8 @@ jobs:
         id: archive
         run: |
           set -euo pipefail
-          ARCHIVE_NAME="ps-radar-${{ steps.version.outputs.tag }}.zip"
-          (cd release-stage && zip -qr "../${ARCHIVE_NAME}" ps-radar)
+          ARCHIVE_NAME="lsn-radar-${{ steps.version.outputs.tag }}.zip"
+          (cd release-stage && zip -qr "../${ARCHIVE_NAME}" lsn-radar)
           echo "name=${ARCHIVE_NAME}" >> "$GITHUB_OUTPUT"
           ls -lh "${ARCHIVE_NAME}"
 

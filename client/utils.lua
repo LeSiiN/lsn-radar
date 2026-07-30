@@ -164,7 +164,7 @@ end
 -- belong to the machine the officer is sitting at, and syncing them would mean
 -- a database round trip every time someone nudges a panel two pixels.
 
-local KVP_KEY = 'ps-radar:prefs'
+local KVP_KEY = 'lsn-radar:prefs'
 
 ---@return table
 function LoadPrefs()

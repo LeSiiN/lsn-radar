@@ -25,9 +25,9 @@ Optional, and worth having:
 
 # Installation
 
-1. Download the release archive and drop the `ps-radar` folder into your
+1. Download the release archive and drop the `lsn-radar` folder into your
    resources directory.
-2. Add `ensure ps-radar` to your server configuration, after `qb-core`.
+2. Add `ensure lsn-radar` to your server configuration, after `qb-core`.
 3. Adjust `shared/config.lua` — at minimum check `Config.Jobs` and
    `Config.VehicleClasses` match your server.
 
@@ -284,27 +284,27 @@ displays it configures have to stay visible while it is open.
 
 ```lua
 -- Arm the BOLO plate
-exports['ps-radar']:SetBolo('46EEK872')
+exports['lsn-radar']:SetBolo('46EEK872')
 
 -- Lock a camera. cam is 'front' or 'rear'
-exports['ps-radar']:LockCamera('front', true)
+exports['lsn-radar']:LockCamera('front', true)
 
 -- What the reader currently holds
-local plates = exports['ps-radar']:GetPlates()
+local plates = exports['lsn-radar']:GetPlates()
 -- { front = '46EEK872', rear = '68HBW691', bolo = '46EEK872' }
 
 -- Last locked speed per antenna — for a citation form that would rather not
 -- ask the officer to retype a number the radar already knows.
-local speeds = exports['ps-radar']:GetLockedSpeeds()
+local speeds = exports['lsn-radar']:GetLockedSpeeds()
 -- { unit = 'kmh', front = 141, rear = nil }
 ```
 
 ## Server exports
 
 ```lua
-exports['ps-radar']:TogglePlateLock(clientId, 'front', true)
-exports['ps-radar']:SetBolo(clientId, '46EEK872')   -- -1 for everyone
-exports['ps-radar']:OpenRemote(clientId)
+exports['lsn-radar']:TogglePlateLock(clientId, 'front', true)
+exports['lsn-radar']:SetBolo(clientId, '46EEK872')   -- -1 for everyone
+exports['lsn-radar']:OpenRemote(clientId)
 ```
 
 ## Server events
@@ -312,15 +312,15 @@ exports['ps-radar']:OpenRemote(clientId)
 Register them before adding a handler, as with any net event.
 
 ```lua
-AddEventHandler('ps-radar:onPlateScanned', function(src, cam, plate, index)
+AddEventHandler('lsn-radar:onPlateScanned', function(src, cam, plate, index)
     -- Fires every time a camera reads a new plate
 end)
 
-AddEventHandler('ps-radar:onPlateLocked', function(src, cam, plate, index)
+AddEventHandler('lsn-radar:onPlateLocked', function(src, cam, plate, index)
     -- Fires when an operator locks a plate
 end)
 
-AddEventHandler('ps-radar:onSpeedLocked', function(src, speed, unit, plate)
+AddEventHandler('lsn-radar:onSpeedLocked', function(src, speed, unit, plate)
     -- Fires on an automatic lock
 end)
 ```
@@ -382,7 +382,7 @@ clear.
 
 Plate check cards need a `street`, and it can only be resolved on a client —
 `GetStreetNameAtCoord` is a client native, while `PlateCheckAlert` runs on the
-server. ps-radar resolves it and passes it as a fifth argument.
+server. lsn-radar resolves it and passes it as a fifth argument.
 
 **This needs a two-line change in ps-mdt**, documented in
 [`docs/ps-mdt-street-patch.md`](docs/ps-mdt-street-patch.md). Without it the
@@ -440,7 +440,7 @@ They are not shown at all, on purpose. See [Antennas](#antennas).
 
 **My keybinds stopped working.**
 `RegisterKeyMapping` occasionally fails to register. Remove the
-`rbind ps-radar ...` lines from `%AppData%\CitizenFX\fivem.cfg` and rejoin so
+`rbind lsn-radar ...` lines from `%AppData%\CitizenFX\fivem.cfg` and rejoin so
 the resource can create them again.
 
 # Credits

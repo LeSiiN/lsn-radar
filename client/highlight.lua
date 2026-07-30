@@ -111,14 +111,14 @@ RegisterCommand('radaroutlinetest', function()
     local veh = GetClosestVehicle(GetEntityCoords(ped), 30.0, 0, 71)
 
     if not veh or veh == 0 or not DoesEntityExist(veh) then
-        print('^3[ps-radar]^7 no vehicle within 30m to test on')
+        print('^3[lsn-radar]^7 no vehicle within 30m to test on')
         return
     end
 
     SetEntityDrawOutlineColor(255, 255, 255, 255)
     pcall(SetEntityDrawOutlineShader, 0)
     SetEntityDrawOutline(veh, true)
-    print(('^2[ps-radar]^7 outline on entity %s for 5s — if nothing appears, the native is unsupported on this build'):format(veh))
+    print(('^2[lsn-radar]^7 outline on entity %s for 5s — if nothing appears, the native is unsupported on this build'):format(veh))
 
     CreateThread(function()
         Wait(5000)

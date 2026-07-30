@@ -56,13 +56,13 @@ local function sendToMdt(cam, plate, index)
     -- No street resolved here. ps-dispatch already does it for its own plate
     -- log, and the alert card has no business showing a location at all — see
     -- docs/ps-dispatch-answer-cards.md.
-    TriggerServerEvent('ps-radar:server:checkPlate', cam, plate, index, GetEntityCoords(PlayerPedId()))
+    TriggerServerEvent('lsn-radar:server:checkPlate', cam, plate, index, GetEntityCoords(PlayerPedId()))
 end
 
 --- The MDT's answer. Arrives asynchronously, so the plate may already have
 --- scrolled out of the window by the time it lands — in which case it is
 --- dropped rather than flagging whatever is in there now.
-RegisterNetEvent('ps-radar:client:plateResult', function(cam, plate, hits, severity)
+RegisterNetEvent('lsn-radar:client:plateResult', function(cam, plate, hits, severity)
     local c = PlateState.cameras[cam]
     if not c or c.plate ~= plate then return end
 
@@ -126,7 +126,7 @@ function TogglePlateLock(cam, state, silent)
         c.hits     = nil
         c.severity = nil
     elseif c.plate and c.plate ~= '' then
-        TriggerServerEvent('ps-radar:server:plateLocked', cam, c.plate, c.index)
+        TriggerServerEvent('lsn-radar:server:plateLocked', cam, c.plate, c.index)
     end
 
     if not silent then PlayRadarSound('Lock', 200) end
@@ -233,7 +233,7 @@ local function commit(cam, veh)
     c.checked  = false
 
     PlayRadarSound('Blip', 200)
-    TriggerServerEvent('ps-radar:server:plateScanned', cam, plate, c.index)
+    TriggerServerEvent('lsn-radar:server:plateScanned', cam, plate, c.index)
 
     -- An armed BOLO takes precedence over the automatic check: it is what this
     -- operator personally decided to watch for.
