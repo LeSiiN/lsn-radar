@@ -1,0 +1,178 @@
+name: Release (Auto-Bump)
+
+# Jeder Push auf main erzeugt ein Release: Patch-Version hochzaehlen, UI bauen,
+# gebautes html/ zurueck committen, taggen, ZIP veroeffentlichen.
+#
+# Das gebaute html/ wird bewusst mit committet. Sonst laeuft der Repo-Stand
+# gegenueber ui/src auseinander und niemand merkt es, weil das ZIP ja korrekt
+# ist — genau so ist ein Feature unbemerkt aus einem Release verschwunden.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      allow_series_change:
+        description: "Wechsel der MAJOR.MINOR-Serie erlauben (z.B. 1.0.x -> 1.1.x)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+# Zwei parallele Laeufe wuerden sich beim Push des Bump-Commits gegenseitig
+# ueberholen. Nicht abbrechen, sondern anstellen.
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Tags werden fuer die Versionspruefung gebraucht.
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine next version
+        id: version
+        run: |
+          set -euo pipefail
+
+          CURRENT=$(grep -oP "^version\s*=?\s*['\"]\K[^'\"]+" fxmanifest.lua | head -n 1)
+          if [ -z "${CURRENT}" ]; then
+            echo "::error::Keine Version in fxmanifest.lua gefunden"
+            exit 1
+          fi
+
+          case "${CURRENT}" in
+            *.*.*) ;;
+            *) echo "::error::Version '${CURRENT}' ist nicht MAJOR.MINOR.PATCH"; exit 1 ;;
+          esac
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${CURRENT}"
+          NEW="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          TAG="v${NEW}"
+
+          # Guard 1: Tag darf noch nicht existieren.
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            echo "::error::Tag ${TAG} existiert bereits — fxmanifest.lua steht auf einem alten Stand."
+            exit 1
+          fi
+
+          # Guard 2: Kein stiller Serien-Sprung. Genau das hat aus einem
+          # Upstream-Manifest mit 2.2.1 mal ein v2.2.2 gemacht, obwohl die
+          # eigenen Tags bei 1.0.x standen.
+          LATEST=$(git tag -l 'v*' \
+            | sed 's/^v//' \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V | tail -n 1 || true)
+
+          if [ -n "${LATEST}" ] && [ "${{ inputs.allow_series_change }}" != "true" ]; then
+            if [ "${LATEST%.*}" != "${MAJOR}.${MINOR}" ]; then
+              echo "::error::fxmanifest.lua steht auf ${CURRENT} (Serie ${MAJOR}.${MINOR}), letzter Tag ist v${LATEST} (Serie ${LATEST%.*}). Wenn das Absicht ist: workflow_dispatch mit allow_series_change=true."
+              exit 1
+            fi
+          fi
+
+          sed -i -E "s/^(version[[:space:]]*=?[[:space:]]*['\"]).*(['\"])/\1${NEW}\2/" fxmanifest.lua
+
+          echo "version=${NEW}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}"     >> "$GITHUB_OUTPUT"
+          echo "Neue Version: ${NEW} (vorher ${CURRENT})"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm ci --no-audit --no-fund
+
+      - name: Build UI
+        working-directory: ui
+        # vite baut mit emptyOutDir nach ../html und kopiert ui/public/plates
+        # mit. Muss vor dem Staging laufen.
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          set -euo pipefail
+          for f in html/index.html html/index.js html/index.css; do
+            [ -s "$f" ] || { echo "::error::${f} fehlt oder ist leer nach dem Build"; exit 1; }
+          done
+          [ -d html/plates ] || echo "::warning::html/plates fehlt — ui/public/plates pruefen"
+
+      - name: Commit version bump and built UI
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add fxmanifest.lua html
+          git commit -m "chore: release ${{ steps.version.outputs.tag }} [skip ci]"
+
+          # main koennte sich waehrend des Builds bewegt haben.
+          git pull --rebase origin main
+          git push origin main
+
+      - name: Create and push tag
+        run: |
+          set -euo pipefail
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Stage release files
+        run: |
+          set -euo pipefail
+          STAGE_DIR="release-stage/ps-radar"
+          mkdir -p "${STAGE_DIR}"
+
+          # Pflicht — fehlt eines davon, soll das Release scheitern.
+          for dir in client server shared html; do
+            if [ ! -d "${dir}" ]; then
+              echo "::error::Pflichtverzeichnis ${dir}/ fehlt"
+              exit 1
+            fi
+            cp -r "${dir}" "${STAGE_DIR}/"
+          done
+          cp fxmanifest.lua "${STAGE_DIR}/"
+
+          # Optional — je nach Branch vorhanden oder nicht.
+          for item in sounds LICENSE README.md SECURITY.md; do
+            [ -e "${item}" ] && cp -r "${item}" "${STAGE_DIR}/"
+          done
+
+          # ui/ ist Quellcode. fxmanifest laedt nur html/** und locales/*.json,
+          # also hat ui/ (und node_modules) im ZIP nichts verloren.
+          echo "Staged contents:"
+          find "${STAGE_DIR}" -maxdepth 2 -print
+
+      - name: Create release archive
+        id: archive
+        run: |
+          set -euo pipefail
+          ARCHIVE_NAME="ps-radar-${{ steps.version.outputs.tag }}.zip"
+          (cd release-stage && zip -qr "../${ARCHIVE_NAME}" ps-radar)
+          echo "name=${ARCHIVE_NAME}" >> "$GITHUB_OUTPUT"
+          ls -lh "${ARCHIVE_NAME}"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          draft: false
+          # Eine Version wie 1.1.0-beta.1 wuerde als Prerelease erscheinen.
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          make_latest: true
+          files: ${{ steps.archive.outputs.name }}

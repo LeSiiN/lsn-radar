@@ -1,0 +1,664 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+*:focus {
+    outline: none;
+}
+
+:root {
+    font-size: 62.5%;
+    color: #d8d8d8;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+html, body {
+    height: 100vh;
+    width: 100vw;
+    font-size: 1.6rem;
+    overflow: hidden;
+    background: transparent;
+    /* Same stack as ps-mdt and ps-dispatch so all three UIs render identically. */
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: rgba(255, 255, 255, 0.87);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   ps-mdt design language — the same panel anatomy ps-dispatch uses:
+   rgba(26,28,33,.97) surfaces, hairline borders, 6px/4px radii, pixel type
+   sizes in the 9-14px band. Nothing here is skeuomorphic; the radar reads as
+   another MDT surface that happens to display numbers.
+
+   Prefix is rd- rather than pd- so both stylesheets can coexist in one CEF
+   context without either resource having to care.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Panels ─────────────────────────────────────────────────────────────── */
+
+.rd-panel {
+    background: rgba(26, 28, 33, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65);
+}
+
+/* Powered down: the housing is still there, the contents are not. A radar that
+   vanishes when switched off gives the operator no target to switch back on. */
+.rd-panel--off { opacity: 0.72; }
+
+.rd-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 11px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+}
+.rd-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.85);
+}
+.rd-sub {
+    margin-left: auto;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.35);
+    white-space: nowrap;
+}
+
+.rd-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    font-size: 10px;
+    flex-shrink: 0;
+    background: rgba(59, 130, 246, 0.12);
+    color: #93c5fd;
+    border: 1px solid rgba(59, 130, 246, 0.25);
+}
+.rd-icon--off { background: rgba(255, 255, 255, 0.04); color: rgba(255, 255, 255, 0.3); border-color: rgba(255, 255, 255, 0.08); }
+.rd-icon--alert { background: rgba(239, 68, 68, 0.14); color: #f87171; border-color: rgba(239, 68, 68, 0.3); }
+
+.rd-body { padding: 9px 10px 10px; display: flex; flex-direction: column; gap: 7px; }
+
+/* ── Readout ────────────────────────────────────────────────────────────────
+   A real radar head is a seven-segment display, and the giveaway is that the
+   unlit segments are still faintly visible behind the lit ones. That one
+   detail is what makes a number read as an instrument rather than as text, so
+   it is the single piece of skeuomorphism kept here — everything around it
+   stays flat.
+
+   The ghost is a separate layer of 8s underneath, which also fixes the layout
+   problem that comes free with it: the field is always exactly as wide as its
+   widest possible value, so a reading going from 9 to 100 doesn't shove the
+   rest of the row sideways. */
+
+.rd-seg {
+    position: relative;
+    display: inline-block;
+    font-family: "Courier New", monospace;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+.rd-seg-ghost {
+    color: rgba(255, 255, 255, 0.055);
+    pointer-events: none;
+}
+.rd-seg-value {
+    position: absolute;
+    inset: 0;
+    text-align: right;
+}
+
+/* Window roles. Blue is the MDT accent and carries the ordinary reading; amber
+   marks a held value; red is reserved for a lock, which is the only state that
+   is evidence rather than information. */
+.rd-seg--idle   .rd-seg-value { color: rgba(255, 255, 255, 0.22); }
+.rd-seg--live   .rd-seg-value { color: #93c5fd; }
+.rd-seg--hold   .rd-seg-value { color: #fbbf24; }
+.rd-seg--lock   .rd-seg-value { color: #f87171; text-shadow: 0 0 12px rgba(239, 68, 68, 0.45); }
+.rd-seg--patrol .rd-seg-value { color: rgba(255, 255, 255, 0.82); }
+
+.rd-seg--lg { font-size: 30px; }
+.rd-seg--md { font-size: 22px; }
+.rd-seg--sm { font-size: 15px; }
+
+/* ── Antenna block ──────────────────────────────────────────────────────── */
+
+.rd-ant {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    padding: 6px 8px 7px;
+}
+/* A locked antenna carries it on its own edge, the way ps-dispatch marks a
+   responded call. */
+.rd-ant--locked { border-color: rgba(239, 68, 68, 0.35); box-shadow: inset 2px 0 0 rgba(239, 68, 68, 0.7); }
+.rd-ant--hold   { border-color: rgba(245, 158, 11, 0.28); box-shadow: inset 2px 0 0 rgba(245, 158, 11, 0.6); }
+
+.rd-ant-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+}
+.rd-ant-name {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.rd-windows { display: flex; align-items: flex-end; gap: 10px; }
+.rd-win { display: flex; flex-direction: column; gap: 2px; }
+.rd-win--strong { flex: 1; }
+.rd-win-label {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+}
+.rd-win-label--lock { color: rgba(248, 113, 113, 0.7); }
+
+/* ── Badges & pills ─────────────────────────────────────────────────────── */
+
+.rd-badge {
+    border-radius: 3px;
+    padding: 1px 5px;
+    background: rgba(255, 255, 255, 0.05);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+    white-space: nowrap;
+}
+.rd-badge--blue  { background: rgba(59, 130, 246, 0.12); color: #93c5fd; }
+.rd-badge--amber { background: rgba(245, 158, 11, 0.13); color: #fbbf24; }
+.rd-badge--red   { background: rgba(239, 68, 68, 0.14);  color: #f87171; }
+.rd-badge--green { background: rgba(34, 197, 94, 0.12);  color: #4ade80; }
+
+/* Direction arrow: closing or opening. Two characters carry what a paragraph
+   of legend otherwise would. */
+.rd-dir { font-size: 9px; opacity: 0.75; }
+
+/* Power / status dot */
+.rd-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.18);
+}
+.rd-dot--on { background: #4ade80; box-shadow: 0 0 6px rgba(74, 222, 128, 0.6); }
+.rd-dot--xmit { background: #60a5fa; box-shadow: 0 0 6px rgba(96, 165, 250, 0.55); }
+.rd-dot--hold { background: #fbbf24; box-shadow: 0 0 6px rgba(251, 191, 36, 0.55); }
+
+/* ── Plate reader ───────────────────────────────────────────────────────── */
+
+.rd-cam {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    padding: 6px 8px;
+}
+.rd-cam--locked { border-color: rgba(245, 158, 11, 0.3); box-shadow: inset 2px 0 0 rgba(245, 158, 11, 0.65); }
+/* A hit is the one thing on this panel that has to survive peripheral vision. */
+.rd-cam--flagged {
+    border-color: rgba(239, 68, 68, 0.55);
+    background: rgba(239, 68, 68, 0.07);
+    box-shadow: inset 2px 0 0 rgb(239, 68, 68);
+    animation: rdFlagPulse 1.5s ease-in-out infinite;
+}
+@keyframes rdFlagPulse {
+    0%, 100% { box-shadow: inset 2px 0 0 rgb(239, 68, 68), 0 0 0 rgba(239, 68, 68, 0); }
+    50%      { box-shadow: inset 2px 0 0 rgb(239, 68, 68), 0 0 14px -2px rgba(239, 68, 68, 0.7); }
+}
+
+.rd-cam-name {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.35);
+    width: 34px;
+    flex-shrink: 0;
+}
+.rd-cam-body { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
+
+/* Empty window: a placeholder that reads as an instrument at rest rather than
+   as a bug. */
+.rd-cam-empty {
+    font-family: "Courier New", monospace;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.14);
+}
+
+/* Neutral plate badge, ps-dispatch's .pd-plate verbatim. */
+.rd-plate {
+    font-family: "Courier New", monospace;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.88);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+    padding: 2px 7px;
+    white-space: nowrap;
+}
+
+/* Plate art, same four images and colour mapping ps-dispatch uses. */
+.rd-plateart {
+    display: inline-block;
+    padding: 8px 5px 3px;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    border-radius: 3px;
+    font-family: "Courier New", monospace;
+    font-weight: 700;
+    font-size: 12.5px;
+    letter-spacing: 0.5px;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    flex-shrink: 0;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.rd-plateart--plateblack  { color: #e0b52e; text-shadow: none; }
+.rd-plateart--plateblue   { color: #d98a1a; text-shadow: none; }
+.rd-plateart--platewhite  { color: #1c3f94; }
+.rd-plateart--platewhite2 { color: #1c3f94; }
+
+/* ── Controls ───────────────────────────────────────────────────────────── */
+
+.rd-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.1s;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.7);
+}
+.rd-btn:hover { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.9); }
+.rd-btn--green { background: rgb(41, 158, 109); color: #fff; }
+.rd-btn--green:hover { background: rgb(34, 190, 131); }
+.rd-btn--red { background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.3); }
+.rd-btn--red:hover { background: rgba(239, 68, 68, 0.25); }
+
+.rd-ctl {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 9px;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+.rd-ctl:hover { color: rgba(255, 255, 255, 0.75); border-color: rgba(255, 255, 255, 0.12); }
+.rd-ctl--active { color: #93c5fd; border-color: rgba(59, 130, 246, 0.35); background: rgba(59, 130, 246, 0.1); }
+.rd-ctl--alert  { color: #f87171; border-color: rgba(239, 68, 68, 0.3); }
+
+/* Segmented mode switch (SAME / OPP / BOTH) */
+.rd-seg-switch { display: flex; gap: 2px; margin-left: auto; }
+.rd-seg-switch button {
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(0, 0, 0, 0.2);
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+.rd-seg-switch button:hover { color: rgba(255, 255, 255, 0.75); }
+.rd-seg-switch button.is-active {
+    background: rgba(56, 189, 248, 0.16);
+    border-color: rgba(56, 189, 248, 0.3);
+    color: rgba(125, 211, 252, 0.95);
+}
+
+.rd-kbd {
+    display: inline-block;
+    padding: 0 5px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom-width: 2px;
+    background: rgba(255, 255, 255, 0.06);
+    font-family: "Courier New", monospace;
+    font-size: 10px;
+    line-height: 15px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* ── Control panel (ImpoundForm anatomy, same as ps-dispatch settings) ───── */
+
+.rd-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+}
+.rd-modal {
+    width: 360px;
+    background: rgba(26, 28, 33, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65);
+    overflow: hidden;
+}
+.rd-modal-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 13px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+}
+.rd-modal-title { font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.85); flex: 1; }
+.rd-modal-body {
+    padding: 14px 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    max-height: 72vh;
+    overflow-y: auto;
+}
+
+.rd-form-group { display: flex; flex-direction: column; gap: 5px; }
+.rd-form-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+}
+.rd-form-hint { font-size: 10px; color: rgba(255, 255, 255, 0.3); }
+
+.rd-row { display: flex; align-items: center; gap: 10px; }
+.rd-row--between { justify-content: space-between; }
+
+.rd-input {
+    flex: 1;
+    min-width: 0;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 6px 9px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 11px;
+    font-family: "Courier New", monospace;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    transition: border-color 0.15s;
+}
+.rd-input:focus { border-color: rgba(59, 130, 246, 0.45); }
+.rd-input::placeholder { color: rgba(255, 255, 255, 0.25); letter-spacing: 0.5px; }
+
+.rd-range {
+    flex: 1;
+    height: 3px;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 2px;
+    cursor: pointer;
+}
+.rd-range::-webkit-slider-thumb {
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(125, 211, 252, 0.95);
+    cursor: pointer;
+}
+.rd-range-value {
+    font-family: "Courier New", monospace;
+    font-weight: 700;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    width: 52px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+.rd-toggle {
+    position: relative;
+    width: 34px;
+    height: 18px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+.rd-toggle::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.65);
+    transition: all 0.15s;
+}
+.rd-toggle--on { background: rgb(41, 158, 109); border-color: rgb(41, 158, 109); }
+.rd-toggle--on::after { left: 18px; background: #fff; }
+
+.rd-steps { display: flex; gap: 3px; }
+.rd-step {
+    flex: 1;
+    padding: 5px 4px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.1s;
+}
+.rd-step:hover { color: rgba(255, 255, 255, 0.8); }
+.rd-step--active {
+    background: rgba(56, 189, 248, 0.16);
+    border-color: rgba(56, 189, 248, 0.3);
+    color: rgba(125, 211, 252, 0.95);
+}
+
+.rd-divider { height: 1px; background: rgba(255, 255, 255, 0.07); }
+
+/* Keybind reference table at the bottom of the panel */
+.rd-keys { display: flex; flex-direction: column; gap: 4px; }
+.rd-key-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.rd-scroll::-webkit-scrollbar { width: 5px; }
+.rd-scroll::-webkit-scrollbar-track { background: transparent; }
+.rd-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 3px; }
+.rd-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* ── Dragging ───────────────────────────────────────────────────────────────
+   Only possible while the control panel is open, because that is the only time
+   the NUI holds focus and the cursor exists. The dashed outline is how the
+   operator knows the panels became grabbable. */
+.rd-draggable { cursor: grab; }
+.rd-draggable:active { cursor: grabbing; }
+.rd-drag-armed {
+    outline: 1px dashed rgba(125, 211, 252, 0.55);
+    outline-offset: 3px;
+}
+
+/* Global reduced-motion switch, mirroring ps-dispatch's. */
+.rd-no-motion *,
+.rd-no-motion *::before,
+.rd-no-motion *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+    .rd-cam--flagged { animation: none; }
+}
+
+/* ── Control panel ──────────────────────────────────────────────────────────
+   A side panel rather than a centred dialog. The displays it configures have
+   to stay visible and grabbable while it is open, and an overlay across the
+   middle of the screen would hide exactly the thing being adjusted. */
+.rd-remote {
+    position: fixed;
+    top: 50%;
+    right: 24px;
+    transform: translateY(-50%);
+    width: 340px;
+    max-height: 84vh;
+    display: flex;
+    flex-direction: column;
+    background: rgba(26, 28, 33, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65);
+    overflow: hidden;
+    z-index: 70;
+    pointer-events: auto;
+}
+.rd-remote .rd-modal-body { max-height: none; }
+
+.rd-step:disabled { opacity: 0.3; cursor: not-allowed; }
+.rd-step:disabled:hover { color: rgba(255, 255, 255, 0.45); }
+
+/* ── Fixed geometry ─────────────────────────────────────────────────────────
+   Both displays are a constant size in every state. A panel that grows when a
+   plate is read or a lock lands cannot be parked against a screen edge, and the
+   movement is distracting in peripheral vision — which is where a HUD lives.
+
+   Anything optional is hidden with `visibility` rather than removed from the
+   flow, so the space it would occupy is always reserved. */
+
+.rd-head {
+    height: 38px;
+    flex-shrink: 0;
+}
+/* No fixed height. Height stability comes from the *rows* below being fixed and
+   from nothing ever being added to or removed from the flow — optional content
+   is hidden with `visibility`, not unmounted. Pinning an outer height on top of
+   that was a second, hand-computed source of truth, and it was wrong: the block
+   needs 76px, or 117px with a plate row, and the numbers said 74 and 108. The
+   plate row was running out of its own block. */
+.rd-ant {
+    flex-shrink: 0;
+}
+.rd-ant-head {
+    height: 15px;
+    margin-bottom: 5px;
+}
+.rd-windows {
+    height: 41px;
+}
+.rd-win-label {
+    height: 10px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+.rd-cam {
+    height: 38px;
+    flex-shrink: 0;
+}
+.rd-cam-body {
+    overflow: hidden;
+}
+
+/* Direction indicator for the antenna's own filter, as one glyph. The full
+   words live in the control panel where there is room to explain them. */
+.rd-ant-mode {
+    margin-left: auto;
+    font-size: 11px;
+    line-height: 1;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.rd-btn--amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border-color: rgba(245, 158, 11, 0.3); }
+.rd-btn--amber:hover { background: rgba(245, 158, 11, 0.25); }
+.rd-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Merged plate row ───────────────────────────────────────────────────────
+   The plate reader used to be a second panel. Two boxes meant an officer
+   comparing a speed to a plate had to trust that the top row of one lined up
+   with the top row of the other; now each side owns both. */
+
+
+.rd-plate-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 28px;
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+}
+.rd-plate-row--pinned { border-top-color: rgba(239, 68, 68, 0.25); }
+.rd-plate-meta { flex: 1; min-width: 0; display: flex; align-items: center; }
+
+.rd-pin { font-size: 8px; color: rgba(248, 113, 113, 0.75); flex-shrink: 0; }
+
+/* A hit has to survive peripheral vision, so it marks the whole side. */
+.rd-ant--flagged {
+    border-color: rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.06);
+    box-shadow: inset 2px 0 0 rgb(239, 68, 68);
+    animation: rdFlagPulse 1.6s ease-in-out infinite;
+}
+
+.rd-pin--copied { color: rgba(74, 222, 128, 0.9); }

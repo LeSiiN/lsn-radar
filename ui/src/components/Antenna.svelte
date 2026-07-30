@@ -1,0 +1,190 @@
+<script lang="ts">
+  import Segment from "@components/Segment.svelte";
+  import Plate from "@components/Plate.svelte";
+  import type { Antenna, Camera, Cam } from "@typings/type";
+  import { COPIED } from "@store/stores";
+
+  export let cam: Cam;
+  export let data: Antenna;
+  export let camera: Camera | null = null;
+  export let powered: boolean = false;
+  export let showPlate: boolean = true;
+
+  // One block per side, carrying everything that side knows: the antenna that
+  // measures the speed and the camera that reads the plate. They were two
+  // separate panels, which meant an officer comparing a speed to a plate was
+  // reading two boxes and trusting that the front row of one lined up with the
+  // front row of the other. Front is front.
+  //
+  // Everything optional is rendered and hidden with `visibility` rather than
+  // removed from the flow, so nothing here can change the panel's height.
+
+  $: held = powered && !data.xmit;
+  $: locked = powered && !!data.lock;
+  $: readingState = (held ? "hold" : "live") as "hold" | "live";
+  $: showPeak = locked && !!data.lock?.peak && (data.lock?.peak ?? 0) > (data.lock?.speed ?? 0);
+
+  // A pinned camera is being held because this antenna locked the vehicle, so
+  // the plate on screen is the plate the speed belongs to.
+  $: pinned = !!camera?.pinned;
+
+  const MODE_MARK: Record<string, string> = {
+    closing: "\u25B2",
+    away: "\u25BC",
+    both: "\u21C5",
+  };
+
+  const arrow = (dir?: string) => (dir === "closing" ? "\u25B2" : "\u25BC");
+
+  // The reason deliberately does not appear here. ps-mdt already raises a
+  // dispatch card carrying the full text, and repeating it in a 90px slot means
+  // showing "OWNER HAS NO DRIVER L..." — which is worse than showing nothing,
+  // because it looks like information while being unreadable.
+  //
+  // What the row owes the operator is that there *is* a hit and roughly how bad
+  // it is. The card says what.
+  $: hitCount = camera?.hits?.length ?? 0;
+  $: critical = camera?.severity === "critical";
+  // A match on the operator's own watch plate is a different fact from an MDT
+  // record, and it is the one thing here the dispatch card will not mention —
+  // nobody else knows this plate was being watched. It gets its own marker.
+  // Two different facts, and they used to share one flag. `flagged` is "this is
+  // demanding attention right now" and drives the red block; the badge is what
+  // the MDT found, which stays true after the officer has acknowledged it.
+  // Keyed together, acknowledging a hit turned the row green and said "Clear".
+  $: watchHit = hitCount === 0 && camera?.reason === "BOLO";
+</script>
+
+<div
+  class="rd-ant"
+  class:rd-ant--locked={locked}
+  class:rd-ant--hold={held && !locked}
+  class:rd-ant--flagged={camera?.flagged}
+>
+  <div class="rd-ant-head">
+    <span class="rd-dot" class:rd-dot--xmit={powered && data.xmit} class:rd-dot--hold={held}></span>
+    <span class="rd-ant-name">{cam}</span>
+
+    {#if locked}
+      <span class="rd-badge rd-badge--red">LOCK</span>
+      <span class="rd-ant-mode rd-track" class:rd-stale={data.lock?.lost}>
+        {data.lock?.lost ? "\u26A0" : "\u25CF"}
+      </span>
+    {:else}
+      <span
+        class="rd-badge"
+        class:rd-badge--amber={held}
+        class:rd-badge--blue={powered && data.xmit}
+        style:visibility={powered ? "visible" : "hidden"}
+      >{data.xmit ? "XMIT" : "HOLD"}</span>
+
+      <span class="rd-ant-mode" style:visibility={powered ? "visible" : "hidden"}>
+        {MODE_MARK[data.mode] ?? MODE_MARK.both}
+      </span>
+    {/if}
+  </div>
+
+  <div class="rd-windows">
+    <div class="rd-win rd-win--strong">
+      <span class="rd-win-label">
+        Strong
+        <span class="rd-dir" style:visibility={powered && data.strong ? "visible" : "hidden"}>
+          {arrow(data.strong?.dir)}
+        </span>
+      </span>
+      <Segment
+        value={powered && data.strong ? data.strong.speed : null}
+        size="lg"
+        state={powered && data.strong ? readingState : "idle"}
+      />
+    </div>
+
+    <div class="rd-win">
+      <span class="rd-win-label">
+        Fast
+        <span class="rd-dir" style:visibility={powered && data.fast ? "visible" : "hidden"}>
+          {arrow(data.fast?.dir)}
+        </span>
+      </span>
+      <Segment
+        value={powered && data.fast ? data.fast.speed : null}
+        size="md"
+        state={powered && data.fast ? readingState : "idle"}
+      />
+    </div>
+
+    <div class="rd-win">
+      <span class="rd-win-label rd-win-label--lock">
+        {#if showPeak}Peak {data.lock?.peak}{:else}Lock{/if}
+        <span class="rd-dir" style:visibility={locked && data.lock?.auto ? "visible" : "hidden"}>A</span>
+      </span>
+      <Segment
+        value={locked ? data.lock?.speed ?? null : null}
+        size="md"
+        state={locked ? "lock" : "idle"}
+      />
+    </div>
+  </div>
+
+  {#if showPlate}
+    <div class="rd-plate-row" class:rd-plate-row--pinned={pinned}>
+      {#if powered && camera?.plate}
+        <Plate plate={camera.plate} index={camera.index} />
+
+        <div class="rd-plate-meta">
+          {#if watchHit}
+            <span class="rd-badge rd-badge--red rd-hit" aria-label="Your watch plate">
+              <i class="fas fa-eye"></i>
+            </span>
+          {:else if hitCount > 0}
+            <span class="rd-badge rd-hit" class:rd-badge--red={critical} class:rd-badge--amber={!critical}>
+              <i class="fas fa-triangle-exclamation"></i>
+              {#if hitCount > 1}{hitCount}{/if}
+            </span>
+          {:else if camera.checked}
+            <span class="rd-badge rd-badge--green">Clear</span>
+          {:else}
+            <span class="rd-badge">Checking</span>
+          {/if}
+        </div>
+
+        <!-- Pinned means this plate is held because the antenna beside it
+             locked the vehicle. Without the marker a held plate and a plate
+             that merely happens to still be in view look identical. -->
+        <!-- Copy confirmation takes the pin's slot for a moment. Both are
+             single glyphs about the same plate, and the officer who just
+             pressed the key is looking here. -->
+        {#if $COPIED === cam}
+          <span class="rd-pin rd-pin--copied" aria-label="Plate copied">
+            <i class="fas fa-check"></i>
+          </span>
+        {:else}
+          <span class="rd-pin" style:visibility={pinned ? "visible" : "hidden"} aria-label="Held with the lock">
+            <i class="fas fa-thumbtack"></i>
+          </span>
+        {/if}
+      {:else}
+        <span class="rd-cam-empty">--------</span>
+      {/if}
+    </div>
+  {/if}
+</div>
+
+<style>
+  /* Red only while tracking. This used to colour the direction glyph as well,
+     because a scoped rule outranks the global one on specificity — so an idle
+     antenna showed its filter marker in the colour this interface reserves for
+     a lock. */
+  .rd-track {
+    color: rgba(248, 113, 113, 0.85);
+  }
+  .rd-track.rd-stale {
+    color: rgba(251, 191, 36, 0.9);
+  }
+  .rd-hit {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+</style>
