@@ -404,24 +404,6 @@ If the lookup is denied — an officer whose job is not in the MDT's
 `allowedJobTypes` — the reader says nothing rather than reporting the plate as
 clear.
 
-## Alert cards
-
-A plate check card used to show a map thumbnail and a location strip reading
-*Unknown location*. Both are gone by design rather than by accident: see
-[`docs/ps-dispatch-answer-cards.md`](docs/ps-dispatch-answer-cards.md), which
-carries a two-condition patch for ps-dispatch.
-
-The short version — `PlateCheckAlert` sends a **targeted** alert, so it reaches
-only the officer who ran the plate, and that officer is standing at the
-location. A map centred on where they already are, above the answer they asked
-for, is the wrong half of the card. ps-dispatch already separates jobs from
-answers internally (an alert carrying a footer is an answer); the card renderer
-just does not act on it yet.
-
-lsn-radar deliberately does **not** resolve or send a street. ps-dispatch already
-does that for its own plate log, which is the one view where "where was that"
-is a real question.
-
 ## Dispatch integration
 
 `Config.Integration.SpeedAlert` fires a `ps-dispatch` alert when an automatic
