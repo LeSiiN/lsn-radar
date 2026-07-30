@@ -13,6 +13,8 @@ new.
 # Dependency
 
 - [qb-core](https://github.com/qbcore-framework/qb-core)
+  or
+- [qbx_core](https://github.com/Qbox-project/qbx_core)
 
 Optional, and worth having:
 
