@@ -36,8 +36,8 @@ Config.Radar = {
     -- detection is a cone test plus a line-of-sight check rather than a sphere
     -- lookup, so long ranges stay believable — but they also cost a raycast
     -- per candidate vehicle, so this is a performance dial too.
-    MaxRange     = 350.0,
-    DefaultRange = 250.0,
+    MaxRange     = 100.0,
+    DefaultRange = 75.0,
     MinRange     = 50.0,
 
     -- Half-angle of each antenna's cone, in degrees. A real X-band antenna is
@@ -116,7 +116,7 @@ Config.Radar = {
     Preview = {
         Enabled = true,
         -- How long the drawing stays up after the last slider movement.
-        LingerMs = 2500,
+        LingerMs = 5000,
         -- Segments per cone edge. Cheap now that the geometry is cached and
         -- only the drawing happens per frame, so this buys smoothness rather
         -- than costing frames.
@@ -133,7 +133,7 @@ Config.PlateReader = {
 
     -- Range of the plate cameras, in metres. Deliberately much shorter than
     -- the radar: a camera has to actually resolve characters.
-    Range = 45.0,
+    Range = 50.0,
 
     -- Half-angle of the camera cone, in degrees. Wider than the radar antenna
     -- because a plate reader is aimed at a lane, not at a vehicle.
