@@ -181,12 +181,68 @@ function UnpinCamera(cam)
     PushPlatesToNui()
 end
 
---- Arm or clear the BOLO plate. One at a time: a list belongs in the MDT, and
---- an operator watching for three plates at once is watching for none.
+-- ── Watchlist ─────────────────────────────────────────────────────────────
+
+--- Normalise a plate the way both the game and the operator write it.
+---@param plate string|nil
+---@return string|nil
+local function normalise(plate)
+    if type(plate) ~= 'string' then return nil end
+    plate = plate:upper():gsub('%s+', '')
+    return plate ~= '' and plate or nil
+end
+
+--- Is this plate on the operator's own watchlist?
 ---@param plate string
-function SetBoloPlate(plate)
-    plate = (plate or ''):upper():gsub('%s+', '')
-    PlateState.bolo = plate ~= '' and plate or nil
+---@return boolean
+function IsWatched(plate)
+    local list = PlateState.watch
+    if not list then return false end
+    for i = 1, #list do
+        if list[i] == plate then return true end
+    end
+    return false
+end
+
+--- Add a plate to the watchlist. Idempotent, so an export firing twice does not
+--- produce two identical entries the operator then has to remove twice.
+---@param plate string
+---@return boolean added
+function AddWatchPlate(plate)
+    plate = normalise(plate)
+    if not plate then return false end
+    if IsWatched(plate) then return false end
+
+    local list = PlateState.watch
+    if #list >= (Config.PlateReader.MaxWatchPlates or 20) then return false end
+
+    -- Newest first: the plate just added is the one being looked for right now.
+    table.insert(list, 1, plate)
+    PushPlatesToNui()
+    return true
+end
+
+--- Remove one plate from the watchlist.
+---@param plate string
+---@return boolean removed
+function RemoveWatchPlate(plate)
+    plate = normalise(plate)
+    if not plate then return false end
+
+    local list = PlateState.watch
+    for i = #list, 1, -1 do
+        if list[i] == plate then
+            table.remove(list, i)
+            PushPlatesToNui()
+            return true
+        end
+    end
+    return false
+end
+
+function ClearWatchPlates()
+    local list = PlateState.watch
+    for i = #list, 1, -1 do list[i] = nil end
     PushPlatesToNui()
 end
 
@@ -235,10 +291,11 @@ local function commit(cam, veh)
     PlayRadarSound('Blip', 200)
     TriggerServerEvent('lsn-radar:server:plateScanned', cam, plate, c.index)
 
-    -- An armed BOLO takes precedence over the automatic check: it is what this
-    -- operator personally decided to watch for.
-    if PlateState.bolo and plate == PlateState.bolo then
-        FlagCamera(cam, 'BOLO')
+    -- The operator's own watchlist takes precedence over the MDT lookup: it is
+    -- what this officer personally decided to watch for, and it alarms without
+    -- waiting for a server round trip.
+    if IsWatched(plate) then
+        FlagCamera(cam, 'WATCH')
     end
 
     -- Sent regardless of a local BOLO match: the MDT may know things about this

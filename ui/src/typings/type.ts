@@ -66,7 +66,8 @@ export interface Camera {
 export interface PlateData {
   power: boolean;
   enabled: boolean;
-  bolo?: string | null;
+  /** The operator's own watchlist, newest first. */
+  watch: string[];
   front: Camera;
   rear: Camera;
 }
@@ -90,7 +91,8 @@ export interface Limits {
   minScale: number;
   maxScale: number;
   fastLock: boolean;
-  plateBolo: boolean;
+  watchlist: boolean;
+  maxWatch: number;
   plates: boolean;
   mdtMode: "alert" | "lookup" | "off";
   preview: boolean;
@@ -107,7 +109,7 @@ export interface SettingsPayload {
   positions: { radar: Position; plate: Position };
   unit: Unit;
   keyLock: boolean;
-  bolo?: string | null;
+  watch: string[];
   limits: Limits;
   keys: Record<string, string>;
 }

@@ -52,7 +52,12 @@
   // demanding attention right now" and drives the red block; the badge is what
   // the MDT found, which stays true after the officer has acknowledged it.
   // Keyed together, acknowledging a hit turned the row green and said "Clear".
-  $: watchHit = hitCount === 0 && camera?.reason === "BOLO";
+  $: watchHit = hitCount === 0 && camera?.reason === "WATCH";
+
+  // A tick in the corner was too quiet for something triggered by a key press
+  // the operator cannot see the result of anywhere else. The confirmation now
+  // takes the whole row and names the plate it put on the clipboard.
+  $: copied = $COPIED && $COPIED.cam === cam ? $COPIED : null;
 </script>
 
 <div
@@ -127,8 +132,14 @@
   </div>
 
   {#if showPlate}
-    <div class="rd-plate-row" class:rd-plate-row--pinned={pinned}>
-      {#if powered && camera?.plate}
+    <div class="rd-plate-row" class:rd-plate-row--pinned={pinned} class:rd-plate-row--copied={!!copied}>
+      {#if copied}
+        <span class="rd-copied">
+          <i class="fas fa-clipboard-check"></i>
+          <span class="rd-copied-label">Copied</span>
+          <span class="rd-copied-plate">{copied.plate}</span>
+        </span>
+      {:else if powered && camera?.plate}
         <Plate plate={camera.plate} index={camera.index} />
 
         <div class="rd-plate-meta">
@@ -151,18 +162,9 @@
         <!-- Pinned means this plate is held because the antenna beside it
              locked the vehicle. Without the marker a held plate and a plate
              that merely happens to still be in view look identical. -->
-        <!-- Copy confirmation takes the pin's slot for a moment. Both are
-             single glyphs about the same plate, and the officer who just
-             pressed the key is looking here. -->
-        {#if $COPIED === cam}
-          <span class="rd-pin rd-pin--copied" aria-label="Plate copied">
-            <i class="fas fa-check"></i>
-          </span>
-        {:else}
-          <span class="rd-pin" style:visibility={pinned ? "visible" : "hidden"} aria-label="Held with the lock">
-            <i class="fas fa-thumbtack"></i>
-          </span>
-        {/if}
+        <span class="rd-pin" style:visibility={pinned ? "visible" : "hidden"} aria-label="Held with the lock">
+          <i class="fas fa-thumbtack"></i>
+        </span>
       {:else}
         <span class="rd-cam-empty">--------</span>
       {/if}

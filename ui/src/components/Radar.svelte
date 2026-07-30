@@ -10,6 +10,7 @@
   $: scale = $CONFIG.settings.scale;
   $: powered = $RADAR.power;
   $: showPlate = $CONFIG.settings.showPlate && $PLATES.enabled;
+  $: watchCount = $PLATES.watch?.length ?? 0;
 
   // A switched-off radar is not on screen at all. It stays visible while the
   // control panel is open, though — that is where it gets switched back on, and
@@ -42,8 +43,12 @@
         </div>
         <span class="rd-title">Radar</span>
 
-        <span class="rd-badge rd-badge--red rd-watch" style:visibility={$PLATES.bolo ? "visible" : "hidden"}>
-          {$PLATES.bolo || ""}
+        <!-- How many plates are being watched for, not which. A single plate
+             fitted in the header; a list does not, and the count is the part
+             that has to survive a glance — the register itself is in the
+             control panel. -->
+        <span class="rd-badge rd-badge--red rd-watch" style:visibility={watchCount > 0 ? "visible" : "hidden"}>
+          <i class="fas fa-eye"></i> {watchCount}
         </span>
 
         <span class="rd-badge rd-badge--amber" style:visibility={$RADAR.keyLock ? "visible" : "hidden"}>

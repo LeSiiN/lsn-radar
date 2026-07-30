@@ -36,8 +36,8 @@ Config.Radar = {
     -- detection is a cone test plus a line-of-sight check rather than a sphere
     -- lookup, so long ranges stay believable — but they also cost a raycast
     -- per candidate vehicle, so this is a performance dial too.
-    MaxRange     = 150.0,
-    DefaultRange = 100.0,
+    MaxRange     = 350.0,
+    DefaultRange = 250.0,
     MinRange     = 50.0,
 
     -- Half-angle of each antenna's cone, in degrees. A real X-band antenna is
@@ -67,7 +67,7 @@ Config.Radar = {
 
     -- Only auto-lock when the speeding vehicle is driven by a real player. NPC
     -- traffic speeds are a simulation artefact and locking them is noise.
-    FastLockPlayersOnly = false,
+    FastLockPlayersOnly = true,
 
     -- Seconds a locked speed stays on the display before the window releases
     -- it. 0 keeps it until the operator clears it manually.
@@ -133,7 +133,7 @@ Config.PlateReader = {
 
     -- Range of the plate cameras, in metres. Deliberately much shorter than
     -- the radar: a camera has to actually resolve characters.
-    Range = 50.0,
+    Range = 45.0,
 
     -- Half-angle of the camera cone, in degrees. Wider than the radar antenna
     -- because a plate reader is aimed at a lane, not at a vehicle.
@@ -145,9 +145,17 @@ Config.PlateReader = {
     -- the display from strobing through every car in oncoming traffic.
     DwellTime = 350,
 
-    -- BOLO: the operator can arm one plate. When the reader sees it, the window
-    -- locks by itself and alarms.
-    AllowBolo = true,
+    -- The operator's own watchlist: plates they have decided to watch for, kept
+    -- separate from the MDT's records. Real BOLOs need no entry here — the MDT
+    -- check catches those on its own — this is for the car that just made off,
+    -- which the MDT has nothing on yet.
+    AllowWatchlist = true,
+
+    -- Ceiling on the list. A watchlist is a thing an operator is supposed to be
+    -- able to hold in their head; past a couple of dozen it is a database, and
+    -- a database belongs in the MDT. The cap also bounds what the
+    -- AddWatchPlate export can push into a client.
+    MaxWatchPlates = 20,
 
     -- ── MDT integration ──────────────────────────────────────────────────
     -- ps-mdt's plate check was written for exactly this: its own comments call

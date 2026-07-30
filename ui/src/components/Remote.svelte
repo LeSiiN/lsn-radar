@@ -3,12 +3,11 @@
   import { RADAR, PLATES, CONFIG } from "@store/stores";
   import type { Unit, AntennaMode, Cam } from "@typings/type";
 
-  let boloDraft = "";
-  let boloTouched = false;
+  let watchDraft = "";
+  let listOpen = false;
 
-  // Mirror the armed plate into the field until the operator starts typing —
-  // after that the draft is theirs and must not be overwritten by a state push.
-  $: if (!boloTouched) boloDraft = $PLATES.bolo || "";
+  $: watchList = $PLATES.watch ?? [];
+  $: watchFull = watchList.length >= (limits.maxWatch ?? 20);
 
   $: s = $CONFIG.settings;
   $: limits = $CONFIG.limits;
@@ -39,23 +38,22 @@
     SendNUI("closeRemote", {});
   }
 
-  function commitBolo() {
-    SendNUI("setBolo", { plate: boloDraft.trim().toUpperCase() });
-    boloTouched = false;
+  function addWatch() {
+    const plate = watchDraft.trim().toUpperCase();
+    if (!plate) return;
+    SendNUI("addWatch", { plate });
+    // Cleared on submit rather than left in place: the field is for the next
+    // plate, and leaving the last one sitting there invites adding it twice.
+    watchDraft = "";
   }
 
-  function clearBolo() {
-    boloDraft = "";
-    boloTouched = false;
-    SendNUI("setBolo", { plate: "" });
+  function removeWatch(plate: string) {
+    SendNUI("removeWatch", { plate });
   }
 
-  function onBoloKey(e: KeyboardEvent) {
-    if (e.key === "Enter") commitBolo();
-    if (e.key === "Escape") {
-      boloTouched = false;
-      boloDraft = $PLATES.bolo || "";
-    }
+  function onWatchKey(e: KeyboardEvent) {
+    if (e.key === "Enter") addWatch();
+    if (e.key === "Escape") watchDraft = "";
   }
 
   const KEY_LABELS: [string, string][] = [
@@ -266,29 +264,71 @@
 
       <span class="rd-form-hint">{MDT_LABEL[limits.mdtMode] ?? MDT_LABEL.off}</span>
 
-      {#if limits.plateBolo}
+      {#if limits.watchlist}
         <div class="rd-form-group">
-          <span class="rd-form-label">Watch plate</span>
+          <span class="rd-form-label">Watch plates</span>
           <div class="rd-row">
             <input
               class="rd-input"
               maxlength="8"
-              placeholder="Plate to watch for"
-              bind:value={boloDraft}
-              on:input={() => (boloTouched = true)}
-              on:keydown={onBoloKey}
-              on:blur={commitBolo}
+              placeholder={watchFull ? "List is full" : "Add a plate"}
+              disabled={watchFull}
+              bind:value={watchDraft}
+              on:keydown={onWatchKey}
             />
-            {#if $PLATES.bolo}
-              <button class="rd-btn rd-btn--red" style="padding:6px 9px" on:click={clearBolo} aria-label="Clear watch plate">
-                <i class="fas fa-xmark"></i>
+            <button
+              class="rd-btn"
+              style="padding:6px 9px"
+              disabled={watchFull || !watchDraft.trim()}
+              on:click={addWatch}
+              aria-label="Add plate"
+            ><i class="fas fa-plus"></i></button>
+
+            <!-- The list itself lives behind this button. Plates the operator is
+                 watching for are consulted rarely and added often, so the field
+                 stays in the open and the register folds away. -->
+            <button
+              class="rd-btn"
+              class:rd-btn--amber={listOpen}
+              style="padding:6px 9px"
+              on:click={() => (listOpen = !listOpen)}
+              aria-label="Show watch list"
+            >
+              <i class="fas fa-list"></i>
+              {#if watchList.length > 0}
+                <span class="rd-count">{watchList.length}</span>
+              {/if}
+            </button>
+          </div>
+
+          {#if listOpen}
+            <div class="rd-watchlist rd-scroll">
+              {#each watchList as plate (plate)}
+                <div class="rd-watch-row">
+                  <span class="rd-watch-plate">{plate}</span>
+                  <button
+                    class="rd-ctl rd-ctl--alert"
+                    on:click={() => removeWatch(plate)}
+                    aria-label={"Remove " + plate}
+                  ><i class="fas fa-xmark"></i></button>
+                </div>
+              {:else}
+                <div class="rd-watch-empty">Nothing on the list.</div>
+              {/each}
+            </div>
+
+            {#if watchList.length > 0}
+              <button class="rd-btn rd-btn--red" on:click={() => SendNUI("clearWatch", {})}>
+                <i class="fas fa-trash"></i> Clear all
               </button>
             {/if}
-          </div>
+          {/if}
+
           <span class="rd-form-hint">
-            Your own note, for a plate the MDT has nothing on yet — the car that
-            just made off, for instance. Real BOLOs are already caught by the
-            MDT check above and need no entry here. One plate at a time.
+            Your own list, for plates the MDT has nothing on yet — the car that
+            just made off, for instance. Real BOLOs need no entry here: the MDT
+            check catches those on its own. Up to {limits.maxWatch ?? 20} plates,
+            and a match alarms immediately without waiting on the server.
           </span>
         </div>
       {/if}

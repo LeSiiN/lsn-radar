@@ -61,7 +61,21 @@ RadarState = {
 
 PlateState = {
     power = false,
-    bolo  = prefs.bolo,
+    -- The operator's own watchlist. Copied out of prefs rather than referenced,
+    -- so the table the rest of the code mutates is never the one handed back by
+    -- the JSON decode.
+    watch = (function()
+        local list = {}
+        if type(prefs.watch) == 'table' then
+            for i = 1, #prefs.watch do list[i] = prefs.watch[i] end
+        elseif type(prefs.bolo) == 'string' and prefs.bolo ~= '' then
+            -- Carried over from when the watchlist was a single plate. Someone
+            -- who armed one before this update should not have it quietly
+            -- vanish on the first login after it.
+            list[1] = prefs.bolo
+        end
+        return list
+    end)(),
     cameras = {
         front = { plate = '', index = nil, locked = false, pinned = false, flagged = false, reason = nil, hits = nil, severity = nil, checked = false },
         rear  = { plate = '', index = nil, locked = false, pinned = false, flagged = false, reason = nil, hits = nil, severity = nil, checked = false },
@@ -88,7 +102,7 @@ local function persist()
         rearMode  = RadarState.antennas.rear.mode,
         radarPos  = RadarState.positions.radar,
         platePos  = RadarState.positions.plate,
-        bolo      = PlateState.bolo,
+        watch     = PlateState.watch,
     })
 end
 
@@ -185,7 +199,7 @@ function PushPlatesToNui()
         data = {
             power   = PlateState.power,
             enabled = Config.PlateReader.Enabled,
-            bolo    = PlateState.bolo,
+            watch   = PlateState.watch,
             front   = PlateState.cameras.front,
             rear    = PlateState.cameras.rear,
         },
@@ -202,14 +216,15 @@ function PushSettingsToNui()
             positions = RadarState.positions,
             unit      = RadarState.unit,
             keyLock   = RadarState.keyLock,
-            bolo      = PlateState.bolo,
+            watch     = PlateState.watch,
             limits = {
                 minRange  = Config.Radar.MinRange,
                 maxRange  = Config.Radar.MaxRange,
                 minScale  = Config.UI.MinScale,
                 maxScale  = Config.UI.MaxScale,
                 fastLock  = Config.Radar.AllowFastLock,
-                plateBolo = Config.PlateReader.AllowBolo,
+                watchlist = Config.PlateReader.AllowWatchlist,
+                maxWatch  = Config.PlateReader.MaxWatchPlates or 20,
                 plates    = Config.PlateReader.Enabled,
                 mdtMode   = Config.PlateReader.Mdt and Config.PlateReader.Mdt.Mode or 'off',
                 preview   = Config.Radar.Preview and Config.Radar.Preview.Enabled or false,
@@ -502,8 +517,20 @@ RegisterNUICallback('plateLock', function(data, cb)
     cb('ok')
 end)
 
-RegisterNUICallback('setBolo', function(data, cb)
-    SetBoloPlate(data.plate or '')
+RegisterNUICallback('addWatch', function(data, cb)
+    AddWatchPlate(data.plate or '')
+    persist()
+    cb('ok')
+end)
+
+RegisterNUICallback('removeWatch', function(data, cb)
+    RemoveWatchPlate(data.plate or '')
+    persist()
+    cb('ok')
+end)
+
+RegisterNUICallback('clearWatch', function(_, cb)
+    ClearWatchPlates()
     persist()
     cb('ok')
 end)
@@ -568,11 +595,26 @@ end)
 -- issue a BOLO there, push the plate here, and every unit's reader starts
 -- watching for it.
 
---- Arm the BOLO plate from another resource.
+--- Add a plate to this officer's watchlist from another resource.
 ---@param plate string
-exports('SetBolo', function(plate)
-    SetBoloPlate(plate)
-end)
+---@return boolean added true if it was added, false if already present, empty
+---                      or the list is full
+exports('AddWatchPlate', function(plate) return AddWatchPlate(plate) end)
+exports('RemoveWatchPlate', function(plate) return RemoveWatchPlate(plate) end)
+exports('ClearWatchPlates', function() ClearWatchPlates() end)
+
+--- A copy of the watchlist. Copied rather than handed out directly, so a caller
+--- cannot mutate the live list through the reference it was given.
+---@return table
+local function watchPlatesCopy()
+    local copy = {}
+    for i = 1, #PlateState.watch do copy[i] = PlateState.watch[i] end
+    return copy
+end
+
+--- The plates this officer is currently watching for.
+---@return table
+exports('GetWatchPlates', watchPlatesCopy)
 
 --- Lock a plate reader camera. Used by a CAD or the MDT to make a unit's reader
 --- hold a plate it has been told to care about.
@@ -590,7 +632,7 @@ exports('GetPlates', function()
     return {
         front = PlateState.cameras.front.plate,
         rear  = PlateState.cameras.rear.plate,
-        bolo  = PlateState.bolo,
+        watch = watchPlatesCopy(),
     }
 end)
 
@@ -607,8 +649,14 @@ exports('GetLockedSpeeds', function()
     }
 end)
 
-RegisterNetEvent('lsn-radar:client:setBolo', function(plate)
-    SetBoloPlate(plate)
+RegisterNetEvent('lsn-radar:client:addWatch', function(plate)
+    AddWatchPlate(plate)
+    persist()
+end)
+
+RegisterNetEvent('lsn-radar:client:removeWatch', function(plate)
+    RemoveWatchPlate(plate)
+    persist()
 end)
 
 RegisterNetEvent('lsn-radar:client:lockCamera', function(cam, beep)

@@ -150,12 +150,19 @@ exports('TogglePlateLock', function(clientId, cam, beep)
     return true
 end)
 
---- Push a BOLO plate to one unit, or to everyone with -1. The MDT issuing a
---- BOLO is the case this exists for.
+--- Add a plate to one unit's watchlist, or to everyone with -1.
+---
+--- Adds rather than replaces: the list holds several plates, and a caller
+--- pushing a lookout almost never meant to wipe the ones already there. Use
+--- RemoveWatchPlate to take one back off.
 ---@param clientId number
 ---@param plate string
-exports('SetBolo', function(clientId, plate)
-    TriggerClientEvent('lsn-radar:client:setBolo', clientId, plate)
+exports('AddWatchPlate', function(clientId, plate)
+    TriggerClientEvent('lsn-radar:client:addWatch', clientId, plate)
+end)
+
+exports('RemoveWatchPlate', function(clientId, plate)
+    TriggerClientEvent('lsn-radar:client:removeWatch', clientId, plate)
 end)
 
 --- Open a unit's control panel from elsewhere.

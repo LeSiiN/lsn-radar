@@ -56,8 +56,8 @@
       return;
     }
 
-    COPIED.set(data.cam);
-    setTimeout(() => COPIED.update((c) => (c === data.cam ? null : c)), 1400);
+    COPIED.set({ cam: data.cam, plate: data.plate });
+    setTimeout(() => COPIED.update((c) => (c && c.cam === data.cam ? null : c)), 1600);
   });
 
   // Browser development fixtures. Only fire outside the game — isEnvBrowser
@@ -71,10 +71,10 @@
         positions: { radar: { x: 0.02, y: 0.22 }, plate: { x: 0.02, y: 0.62 } },
         unit: "kmh",
         keyLock: false,
-        bolo: "46EEK872",
+        watch: ["46EEK872", "68HBW691"],
         limits: {
           minRange: 50, maxRange: 350, minScale: 0.7, maxScale: 1.4,
-          fastLock: true, plateBolo: true, plates: true, mdtMode: "alert", preview: true, marker: true,
+          fastLock: true, watchlist: true, maxWatch: 20, plates: true, mdtMode: "alert", preview: true, marker: true,
         },
         keys: {
           Remote: "NUMPAD7", KeyLock: "L", FrontAnt: "NUMPAD8",
@@ -103,7 +103,7 @@
       data: {
         power: true,
         enabled: true,
-        bolo: "46EEK872",
+        watch: ["46EEK872"],
         front: { plate: "46EEK872", index: 1, locked: true, pinned: true, flagged: true, reason: "BOLO",
           hits: [{ label: "Stolen", severity: "critical" }, { label: "Owner wanted", severity: "critical" }], checked: true },
         rear: { plate: "68HBW691", index: 3, locked: false, flagged: false, checked: true },

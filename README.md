@@ -196,11 +196,35 @@ without which the window strobes through every car in oncoming traffic.
 Plate art uses the same four images and the same index mapping as
 `ps-dispatch`, so a plate looks identical in both resources.
 
-**Watch plate:** one plate the operator can arm by hand, for a car the MDT has
-nothing on yet — the one that just made off, for instance. Real BOLOs need no
-entry here: the MDT check catches them on its own, since `bolo` is one of
-`Config.PlateCheck.checks`. A list belongs in the MDT anyway; an operator
-watching for three plates at once is watching for none.
+**Watch plates:** the operator's own list, for cars the MDT has nothing on yet —
+the one that just made off, for instance. Real BOLOs need no entry: the MDT
+check catches them on its own, since `bolo` is one of
+`Config.PlateCheck.checks`. A match alarms immediately, without waiting on a
+server round trip.
+
+The field for adding sits in the open; the register folds away behind a button
+next to it, with a count badge. Plates are added often and consulted rarely, so
+that is the way round it belongs. `Config.PlateReader.MaxWatchPlates` caps the
+list at 20 — past a couple of dozen it is a database, and a database belongs in
+the MDT. The cap also bounds what the export can push into a client.
+
+The radar header shows the count, not the plates. One plate fitted there; a list
+does not, and the count is the part that survives a glance.
+
+```lua
+exports['lsn-radar']:AddWatchPlate('46EEK872')
+exports['lsn-radar']:RemoveWatchPlate('46EEK872')
+exports['lsn-radar']:ClearWatchPlates()
+local plates = exports['lsn-radar']:GetWatchPlates()
+```
+
+The same four exist server side, taking a client id first — `-1` reaches
+everyone:
+
+```lua
+exports['lsn-radar']:AddWatchPlate(clientId, '46EEK872')
+exports['lsn-radar']:RemoveWatchPlate(clientId, '46EEK872')
+```
 
 # Configuration
 
@@ -283,8 +307,8 @@ displays it configures have to stay visible while it is open.
 ## Client exports
 
 ```lua
--- Arm the BOLO plate
-exports['lsn-radar']:SetBolo('46EEK872')
+-- Add a plate to this officer's watchlist
+exports['lsn-radar']:AddWatchPlate('46EEK872')
 
 -- Lock a camera. cam is 'front' or 'rear'
 exports['lsn-radar']:LockCamera('front', true)
@@ -303,7 +327,7 @@ local speeds = exports['lsn-radar']:GetLockedSpeeds()
 
 ```lua
 exports['lsn-radar']:TogglePlateLock(clientId, 'front', true)
-exports['lsn-radar']:SetBolo(clientId, '46EEK872')   -- -1 for everyone
+exports['lsn-radar']:AddWatchPlate(clientId, '46EEK872')   -- -1 for everyone
 exports['lsn-radar']:OpenRemote(clientId)
 ```
 
@@ -378,17 +402,23 @@ If the lookup is denied — an officer whose job is not in the MDT's
 `allowedJobTypes` — the reader says nothing rather than reporting the plate as
 clear.
 
-## Alert location
+## Alert cards
 
-Plate check cards need a `street`, and it can only be resolved on a client —
-`GetStreetNameAtCoord` is a client native, while `PlateCheckAlert` runs on the
-server. lsn-radar resolves it and passes it as a fifth argument.
+A plate check card used to show a map thumbnail and a location strip reading
+*Unknown location*. Both are gone by design rather than by accident: see
+[`docs/ps-dispatch-answer-cards.md`](docs/ps-dispatch-answer-cards.md), which
+carries a two-condition patch for ps-dispatch.
 
-**This needs a two-line change in ps-mdt**, documented in
-[`docs/ps-mdt-street-patch.md`](docs/ps-mdt-street-patch.md). Without it the
-cards read *Unknown location* — which they already do today for every caller,
-so nothing gets worse by not applying it. The extra argument is simply dropped
-by an unpatched ps-mdt.
+The short version — `PlateCheckAlert` sends a **targeted** alert, so it reaches
+only the officer who ran the plate, and that officer is standing at the
+location. A map centred on where they already are, above the answer they asked
+for, is the wrong half of the card. ps-dispatch already separates jobs from
+answers internally (an alert carrying a footer is an answer); the card renderer
+just does not act on it yet.
+
+lsn-radar deliberately does **not** resolve or send a street. ps-dispatch already
+does that for its own plate log, which is the one view where "where was that"
+is a real question.
 
 ## Dispatch integration
 

@@ -11,8 +11,9 @@ export const SHOW_RADAR = writable<boolean>(false);
 /** The control panel. Also the only state in which panels can be dragged. */
 export const REMOTE_OPEN = writable<boolean>(false);
 
-/** Which side just had its plate copied, for the brief confirmation tick. */
-export const COPIED = writable<string | null>(null);
+/** Which side just had its plate copied, and what — drives the confirmation
+ *  banner on that row. */
+export const COPIED = writable<{ cam: string; plate: string } | null>(null);
 
 export const RADAR = writable<RadarData>({
   power: false,
@@ -26,7 +27,7 @@ export const RADAR = writable<RadarData>({
 export const PLATES = writable<PlateData>({
   power: false,
   enabled: true,
-  bolo: null,
+  watch: [],
   front: { plate: "", locked: false, flagged: false },
   rear: { plate: "", locked: false, flagged: false },
 });
@@ -36,7 +37,7 @@ export const CONFIG = writable<SettingsPayload>({
   positions: { radar: { x: 0.015, y: 0.3 }, plate: { x: 0.015, y: 0.62 } },
   unit: "kmh",
   keyLock: false,
-  bolo: null,
-  limits: { minRange: 50, maxRange: 350, minScale: 0.7, maxScale: 1.4, fastLock: true, plateBolo: true, plates: true, mdtMode: "alert", preview: true, marker: true },
+  watch: [],
+  limits: { minRange: 50, maxRange: 350, minScale: 0.7, maxScale: 1.4, fastLock: true, watchlist: true, maxWatch: 20, plates: true, mdtMode: "alert", preview: true, marker: true },
   keys: {},
 });
