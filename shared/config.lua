@@ -219,6 +219,23 @@ Config.Handheld = {
     -- working, it only stops officers obtaining one.
     Weapon = 'WEAPON_RAYPISTOL',
 
+    -- ── Prop ─────────────────────────────────────────────────────────────
+    -- The weapon stays as the trigger but is made invisible, and this model is
+    -- attached to the hand in its place.
+    --
+    -- The model is streamed by whichever resource owns it — bzzz_pdradar for
+    -- this one. Do NOT copy the .ydr/.ytyp in here as well: loading the same
+    -- DLC_ITYP_REQUEST twice stops the props working, which the pack's own
+    -- readme warns about.
+
+    Prop = {
+        Enabled  = true,
+        Model    = 'bzzz_police_prop_radar_a',
+        Bone     = 57005,                      -- IK_R_Hand
+        Offset   = { 0.14, 0.04, 0.0 },
+        Rotation = { -100.0, -110.0, -15.0 },
+    },
+
     -- Metres. DefaultRange is what a first-time operator gets; Min and Max are
     -- the ceiling and floor the operator menu moves within, same split as the
     -- mounted antennas.
@@ -255,7 +272,6 @@ Config.Handheld = {
         DefaultOn = false,
         Default = { mph = 80,  kmh = 130 },
         Min     = { mph = 20,  kmh = 30  },
-        Max     = { mph = 250, kmh = 300 },
     },
 }
 

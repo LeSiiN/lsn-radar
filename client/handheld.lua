@@ -38,6 +38,138 @@ local weaponHash
 local lastPushed = ''
 local lastMeasure = 0
 
+-- ── Prop ──────────────────────────────────────────────────────────────────
+-- The weapon stays selected but invisible, and the radar model hangs off the
+-- right hand in its place. Keeping the weapon is what preserves aiming: it
+-- carries the ADS, the crosshair and the trigger, all of which would otherwise
+-- have to be rebuilt out of keypresses.
+
+local propObject
+local propFailed = false
+
+---@return boolean attached
+local function attachProp()
+    local p = cfg().Prop
+    if not p or not p.Enabled or propFailed then return false end
+    if propObject and DoesEntityExist(propObject) then return true end
+
+    local model = GetHashKey(p.Model)
+    if not IsModelInCdimage(model) then
+        -- The model belongs to whichever resource streams it. If that resource
+        -- is missing or stopped, say so once and carry on with a visible
+        -- weapon rather than leaving the officer holding nothing at all.
+        propFailed = true
+        print(('^3[lsn-radar]^7 prop model %s not found — is the resource streaming it running?'):format(p.Model))
+        return false
+    end
+
+    RequestModel(model)
+    local waited = 0
+    while not HasModelLoaded(model) and waited < 3000 do
+        Wait(50)
+        waited = waited + 50
+    end
+
+    if not HasModelLoaded(model) then
+        propFailed = true
+        print(('^3[lsn-radar]^7 prop model %s failed to load'):format(p.Model))
+        return false
+    end
+
+    local ped = PlayerPedId()
+    local c = GetEntityCoords(ped)
+    propObject = CreateObject(model, c.x, c.y, c.z, true, true, false)
+
+    AttachEntityToEntity(
+        propObject, ped, GetPedBoneIndex(ped, p.Bone),
+        p.Offset[1], p.Offset[2], p.Offset[3],
+        p.Rotation[1], p.Rotation[2], p.Rotation[3],
+        true, true, false, true, 1, true
+    )
+
+    SetModelAsNoLongerNeeded(model)
+    return true
+end
+
+local function removeProp()
+    if propObject and DoesEntityExist(propObject) then
+        DetachEntity(propObject, true, true)
+        -- Claimed first: DeleteObject only acts on an entity this client owns,
+        -- and an unclaimed prop survives as litter attached to nothing.
+        SetEntityAsMissionEntity(propObject, true, true)
+        DeleteObject(propObject)
+    end
+    propObject = nil
+end
+
+--- Show or hide the weapon model itself. The prop replaces it visually; the
+--- weapon is still there doing the work nobody can see.
+---
+--- The third argument is `deselectWeapon`, and passing it as true is what made
+--- the ped lower the weapon and draw it again on every call — the aim
+--- animation broke, dropped and came back a moment later, over and over. It
+--- must be false: the weapon is meant to stay exactly where it is and merely
+--- stop being drawn.
+---@param ped number
+---@param visible boolean
+local function setWeaponVisible(ped, visible)
+    SetPedCurrentWeaponVisible(ped, visible, false, true, true)
+end
+
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= GetCurrentResourceName() then return end
+    removeProp()
+end)
+
+--- Load the model before it is needed.
+---
+--- attachProp waits for the model, and that wait blocks the device thread —
+--- which is also the thread holding the firing controls down. On the very first
+--- equip of a session that left a gap of up to three seconds in which the
+--- trigger was live. Loading it once, ahead of time, closes it.
+---
+--- Deliberately not at resource start: a player who never touches a radar gun
+--- should not be holding its model in memory for their whole session.
+local preloaded = false
+
+local function preloadProp()
+    if preloaded or propFailed then return end
+    local p = cfg().Prop
+    if not p or not p.Enabled then return end
+
+    preloaded = true
+
+    CreateThread(function()
+        local model = GetHashKey(p.Model)
+        if not IsModelInCdimage(model) then return end
+
+        RequestModel(model)
+        local waited = 0
+        while not HasModelLoaded(model) and waited < 5000 do
+            Wait(100)
+            waited = waited + 100
+        end
+    end)
+end
+
+--- Re-attach after a respawn.
+---
+--- Not on a timer. Re-asserting visibility periodically was the other half of
+--- the animation problem: even with the deselect flag corrected, there is no
+--- reason to keep telling the game something it already knows. A respawn is the
+--- one moment it genuinely forgets — the ped is new, so the prop is attached to
+--- a body that no longer exists and the weapon is drawn again.
+AddEventHandler('playerSpawned', function()
+    removeProp()
+    propFailed = false
+
+    if not HandheldState.active then return end
+
+    local ped = PlayerPedId()
+    setWeaponVisible(ped, false)
+    if not attachProp() then setWeaponVisible(ped, true) end
+end)
+
 --- Push only when something visible changed. Aiming runs at frame rate, and a
 --- vehicle held steadily in the crosshair produces an identical frame sixty
 --- times a second.
@@ -281,15 +413,27 @@ CreateThread(function()
 
         if cfg().Enabled and HasRadarAccess() then
             weaponHash = weaponHash or GetHashKey(cfg().Weapon)
+            preloadProp()
             local ped = PlayerPedId()
             local holding = GetSelectedPedWeapon(ped) == weaponHash
 
             if holding ~= HandheldState.active then
                 HandheldState.active = holding
-                if not holding then
+
+                if holding then
+                    -- Hidden first, loaded second. Loading the model can take a
+                    -- moment, and doing it the other way round meant the weapon
+                    -- was on screen for exactly as long as the load took — which
+                    -- is the flash of pistol before the radar appears.
+                    setWeaponVisible(ped, false)
+                    if not attachProp() then setWeaponVisible(ped, true) end
+                else
+                    removeProp()
+                    setWeaponVisible(ped, true)
                     HandheldState.lock, HandheldState.aiming = nil, false
                     clearReading()
                 end
+
                 push(true)
             end
 
@@ -339,6 +483,8 @@ CreateThread(function()
             end
         elseif HandheldState.active then
             HandheldState.active, HandheldState.aiming, HandheldState.lock = false, false, nil
+            removeProp()
+            setWeaponVisible(PlayerPedId(), true)
             clearReading()
             push(true)
         end
