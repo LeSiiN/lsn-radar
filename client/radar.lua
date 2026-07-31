@@ -88,7 +88,7 @@ end
 ---@return boolean
 local function shouldFastLock(antenna, target)
     if not target then return false end
-    if not Config.Radar.AllowFastLock then return false end
+    if not Config.Radar.FastLock.Allowed then return false end
 
     local s = RadarState.settings
     if not s.fastLock then return false end
@@ -96,7 +96,7 @@ local function shouldFastLock(antenna, target)
 
     -- An NPC doing 140 on the freeway is a traffic simulation artefact. Locking
     -- it fills the window with a speed nobody can be stopped for.
-    if Config.Radar.FastLockPlayersOnly and not target.isPlayer then return false end
+    if Config.Radar.FastLock.PlayersOnly and not target.isPlayer then return false end
 
     -- A locked antenna is committed to one vehicle until the officer releases
     -- it. Re-locking on whatever else drives into the cone is precisely what

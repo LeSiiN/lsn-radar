@@ -29,6 +29,18 @@ local function cfg() return Config.Radar.TargetMarker end
 local function collectTargets(out)
     for i = #out, 1, -1 do out[i] = nil end
 
+    -- The handheld unit frames whatever is in the crosshair. It takes priority
+    -- and stands alone: if the gun is out, the mounted antennas are not the
+    -- thing being aimed, and two sets of brackets on screen at once would be
+    -- asking the operator which device they are looking at.
+    local gunEntity, gunLocked = GetHandheldTarget()
+    if gunEntity then
+        out[#out + 1] = { entity = gunEntity, locked = gunLocked }
+        return
+    end
+
+    if not RadarState.power then return end
+
     for _, cam in ipairs({ 'front', 'rear' }) do
         local a = RadarState.antennas[cam]
         if a then
@@ -96,9 +108,10 @@ CreateThread(function()
         -- bracket can lag a target that has just been acquired.
         local wait = 100
 
-        if cfg().Enabled and RadarState.settings.marker and RadarState.power then
-            local patrolVeh = GetPatrolVehicle()
-            if patrolVeh then
+        if cfg().Enabled and RadarState.settings.marker then
+            -- Either device may be supplying a target, so the vehicle check no
+            -- longer gates the whole thread — collectTargets decides.
+            if RadarState.power or HandheldState.active then
                 collectTargets(targets)
 
                 if #targets > 0 then

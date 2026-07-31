@@ -1,8 +1,9 @@
 <script lang="ts">
   import AlwaysListener from "@providers/AlwaysListener.svelte";
   import Radar from "@components/Radar.svelte";
+  import Handheld from "@components/Handheld.svelte";
   import Remote from "@components/Remote.svelte";
-  import { SHOW_RADAR, REMOTE_OPEN, BROWSER_MODE, RESOURCE_NAME } from "@store/stores";
+  import { SHOW_RADAR, REMOTE_OPEN, BROWSER_MODE, RESOURCE_NAME, HANDHELD } from "@store/stores";
   import { SendNUI } from "@utils/SendNUI";
   import { onMount } from "svelte";
 
@@ -21,7 +22,12 @@
 
 <AlwaysListener />
 
-{#if $SHOW_RADAR}
+<!-- The device in hand decides. Holding the gun takes precedence over the
+     mounted radar, so a passenger who draws one does not end up with two speed
+     displays disagreeing about which vehicle is being measured. -->
+{#if $HANDHELD.active}
+  <Handheld />
+{:else if $SHOW_RADAR}
   <Radar />
 {/if}
 

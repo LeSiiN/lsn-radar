@@ -2,7 +2,7 @@ import { SendNUI } from "@utils/SendNUI";
 
 interface DragOptions {
   /** Which stored position this panel writes back to. */
-  panel: "radar" | "plate";
+  panel: "radar" | "gun";
   /** Dragging is only possible while the control panel holds NUI focus. */
   enabled: boolean;
 }

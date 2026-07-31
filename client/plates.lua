@@ -33,10 +33,13 @@ local function cfg() return Config.PlateReader end
 --- coalesces concurrent queries for the same plate, holds a per-officer alert
 --- cooldown and a per-minute budget, and audits hits rather than scans. The
 --- radar's only job is not to shout the same plate at it twice.
----@param cam string 'front' | 'rear'
+--- Global rather than local because the handheld unit uses the same route. Two
+--- lookup paths would mean two sets of throttling rules quietly disagreeing
+--- about how often a plate may be asked about.
+---@param cam string 'front' | 'rear' | 'gun'
 ---@param plate string
 ---@param index number|nil
-local function sendToMdt(cam, plate, index)
+function RunPlateCheck(cam, plate, index)
     local mdt = cfg().Mdt
     if not mdt or mdt.Mode == 'off' then return end
     if GetResourceState(mdt.Resource) ~= 'started' then return end
@@ -63,6 +66,14 @@ end
 --- scrolled out of the window by the time it lands — in which case it is
 --- dropped rather than flagging whatever is in there now.
 RegisterNetEvent('lsn-radar:client:plateResult', function(cam, plate, hits, severity)
+    -- The handheld unit has no camera, so its answers go to its own state. The
+    -- lookup, the throttling and the flag rules are shared; only the place the
+    -- answer lands differs.
+    if cam == 'gun' then
+        ApplyHandheldPlateResult(plate, hits, severity)
+        return
+    end
+
     local c = PlateState.cameras[cam]
     if not c or c.plate ~= plate then return end
 
@@ -153,7 +164,7 @@ function PinCameraToPlate(cam, plate, index)
         c.hits     = nil
         c.severity = nil
         c.checked  = false
-        sendToMdt(cam, plate, index)
+        RunPlateCheck(cam, plate, index)
     elseif index ~= nil and c.index == nil then
         -- Same plate the camera was already reading, but the pin knows the
         -- design and the camera might not have got that far.
@@ -300,7 +311,7 @@ local function commit(cam, veh)
 
     -- Sent regardless of a local BOLO match: the MDT may know things about this
     -- plate that the operator's own watchlist does not.
-    sendToMdt(cam, plate, c.index)
+    RunPlateCheck(cam, plate, c.index)
 
     PushPlatesToNui()
 end

@@ -48,6 +48,15 @@ local function refreshPool()
     for k in pairs(readable) do readable[k] = nil end
 end
 
+--- The cached vehicle list, for consumers outside the sweep. The handheld unit
+--- uses it while aiming; sharing the cache means the two devices cannot end up
+--- refreshing the pool twice in the same frame.
+---@return table
+function GetVehiclePool()
+    refreshPool()
+    return pool
+end
+
 ---@param veh number
 ---@return boolean
 local function isReadable(veh)

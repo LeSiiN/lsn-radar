@@ -5,11 +5,12 @@
     RADAR,
     PLATES,
     CONFIG,
+    HANDHELD,
     SHOW_RADAR,
     REMOTE_OPEN,
     COPIED,
   } from "@store/stores";
-  import type { RadarData, PlateData, SettingsPayload } from "@typings/type";
+  import type { RadarData, PlateData, SettingsPayload, HandheldData } from "@typings/type";
 
   ReceiveNUI<RadarData>("radar", (data) => {
     RADAR.set(data);
@@ -17,6 +18,10 @@
 
   ReceiveNUI<PlateData>("plates", (data) => {
     PLATES.set(data);
+  });
+
+  ReceiveNUI<HandheldData>("handheld", (data) => {
+    HANDHELD.set(data);
   });
 
   ReceiveNUI<SettingsPayload>("settings", (data) => {
@@ -67,14 +72,14 @@
     {
       action: "settings",
       data: {
-        settings: { range: 250, sound: true, marker: true, fastLock: true, fastLimit: 130, scale: 1, showPlate: true },
-        positions: { radar: { x: 0.02, y: 0.22 }, plate: { x: 0.02, y: 0.62 } },
+        settings: { range: 250, sound: true, marker: true, fastLock: true, fastLimit: 130, scale: 1, showPlate: true, gunScale: 1, gunRange: 120, gunCone: 2, gunAutoLock: false, gunLimit: 130 },
+        positions: { radar: { x: 0.02, y: 0.22 }, gun: { x: 0.02, y: 0.62 } },
         unit: "kmh",
         keyLock: false,
         watch: ["46EEK872", "68HBW691"],
         limits: {
           minRange: 50, maxRange: 350, minScale: 0.7, maxScale: 1.4,
-          fastLock: true, watchlist: true, maxWatch: 20, plates: true, mdtMode: "alert", preview: true, marker: true,
+          fastLock: true, watchlist: true, maxWatch: 20, plates: true, mdtMode: "alert", preview: true, marker: true, gun: true, gunMinRange: 30, gunMaxRange: 300, gunCones: [1.2, 2, 3.5], limitMin: 30, limitMax: 400, gunLimitMin: 30, gunLimitMax: 400,
         },
         keys: {
           Remote: "NUMPAD7", KeyLock: "L", FrontAnt: "NUMPAD8",

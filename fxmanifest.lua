@@ -4,7 +4,7 @@ game "gta5"
 
 author "LeSiiN"
 description "Police radar and plate reader, styled to match ps-mdt and ps-dispatch"
-version "1.0.5"
+version "1.0.0"
 
 lua54 "yes"
 
@@ -19,6 +19,7 @@ client_script {
   "client/scan.lua",
   "client/radar.lua",
   "client/plates.lua",
+  "client/handheld.lua",
   "client/target.lua",
   "client/preview.lua",
 }

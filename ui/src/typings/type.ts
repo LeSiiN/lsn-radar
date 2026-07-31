@@ -72,6 +72,30 @@ export interface PlateData {
   rear: Camera;
 }
 
+export interface HandheldData {
+  active: boolean;
+  aiming: boolean;
+  unit: Unit;
+  speed?: number | null;
+  plate?: string | null;
+  index?: number | null;
+  dir?: Direction | null;
+  dist?: number | null;
+  lock?: {
+    speed: number;
+    plate?: string | null;
+    index?: number | null;
+    dir?: Direction | null;
+    dist?: number | null;
+    at: number;
+  } | null;
+  hits?: Hit[] | null;
+  severity?: "critical" | "warning" | null;
+  checked?: boolean;
+  flagged?: boolean;
+  reason?: string | null;
+}
+
 export interface Settings {
   range: number;
   sound: boolean;
@@ -83,6 +107,12 @@ export interface Settings {
   autoPower?: boolean;
   /** Bracket the vehicle currently being read. */
   marker?: boolean;
+  /** Handheld unit — kept separate from the mounted radar throughout. */
+  gunScale?: number;
+  gunRange?: number;
+  gunCone?: number;
+  gunAutoLock?: boolean;
+  gunLimit?: number;
 }
 
 export interface Limits {
@@ -97,6 +127,15 @@ export interface Limits {
   mdtMode: "alert" | "lookup" | "off";
   preview: boolean;
   marker: boolean;
+  gun: boolean;
+  gunMinRange: number;
+  gunMaxRange: number;
+  gunCones: number[];
+  /** Slider ends for both auto-lock limits, in the selected unit. */
+  limitMin: number;
+  limitMax: number;
+  gunLimitMin: number;
+  gunLimitMax: number;
 }
 
 export interface Position {
@@ -106,7 +145,7 @@ export interface Position {
 
 export interface SettingsPayload {
   settings: Settings;
-  positions: { radar: Position; plate: Position };
+  positions: { radar: Position; gun: Position };
   unit: Unit;
   keyLock: boolean;
   watch: string[];

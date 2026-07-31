@@ -20,6 +20,7 @@ Config.Jobs = { 'leo' }
 
 -- Vehicle classes that may carry a radar. 18 is VC_EMERGENCY. Add classes here
 -- if unmarked units in this server use civilian-class vehicles.
+
 Config.VehicleClasses = { 18 }
 
 -- Require the player to be on duty. Off-duty officers in a patrol car are a
@@ -36,8 +37,8 @@ Config.Radar = {
     -- detection is a cone test plus a line-of-sight check rather than a sphere
     -- lookup, so long ranges stay believable — but they also cost a raycast
     -- per candidate vehicle, so this is a performance dial too.
-    MaxRange     = 100.0,
-    DefaultRange = 75.0,
+    MaxRange     = 350.0,
+    DefaultRange = 250.0,
     MinRange     = 50.0,
 
     -- Half-angle of each antenna's cone, in degrees. A real X-band antenna is
@@ -58,16 +59,28 @@ Config.Radar = {
     -- Stationary traffic would otherwise keep the windows full of zeroes.
     MinSpeed = { mph = 5, kmh = 8 },
 
-    -- Fast-lock: automatically lock a target that exceeds the operator's set
-    -- limit. Off by default because a radar that locks by itself is a radar
-    -- nobody has to aim.
-    AllowFastLock  = true,
-    DefaultFastLock = false,
-    DefaultFastLimit = { mph = 80, kmh = 130 },
+    -- Automatic lock: lock a target that exceeds the operator's set limit.
+    --
+    -- Min and Max are the ends of the slider in the control panel, per unit.
+    -- They exist so the range means something on your server rather than being
+    -- whatever looked reasonable in a Svelte file — a highway server wants a
+    -- different band from a city one.
+    FastLock = {
+        Allowed = true,
 
-    -- Only auto-lock when the speeding vehicle is driven by a real player. NPC
-    -- traffic speeds are a simulation artefact and locking them is noise.
-    FastLockPlayersOnly = true,
+        -- Off by default: a radar that locks by itself is a radar nobody has
+        -- to aim.
+        DefaultOn = false,
+
+        -- Only lock vehicles driven by a real player. NPC traffic speeds are a
+        -- simulation artefact and locking them fills the window with numbers
+        -- nobody can be stopped for.
+        PlayersOnly = true,
+
+        Default = { mph = 80,  kmh = 130 },
+        Min     = { mph = 20,  kmh = 30  },
+        Max     = { mph = 250, kmh = 400 },
+    },
 
     -- Seconds a locked speed stays on the display before the window releases
     -- it. 0 keeps it until the operator clears it manually.
@@ -116,7 +129,7 @@ Config.Radar = {
     Preview = {
         Enabled = true,
         -- How long the drawing stays up after the last slider movement.
-        LingerMs = 5000,
+        LingerMs = 2500,
         -- Segments per cone edge. Cheap now that the geometry is cached and
         -- only the drawing happens per frame, so this buys smoothness rather
         -- than costing frames.
@@ -133,7 +146,7 @@ Config.PlateReader = {
 
     -- Range of the plate cameras, in metres. Deliberately much shorter than
     -- the radar: a camera has to actually resolve characters.
-    Range = 50.0,
+    Range = 45.0,
 
     -- Half-angle of the camera cone, in degrees. Wider than the radar antenna
     -- because a plate reader is aimed at a lane, not at a vehicle.
@@ -185,13 +198,76 @@ Config.PlateReader = {
     },
 }
 
+-- ── Handheld unit ─────────────────────────────────────────────────────────
+-- A radar gun. Held like a weapon, aimed at a vehicle, reads its speed and
+-- plate.
+--
+-- The device is chosen by what is in the officer's hand, not by a setting. In a
+-- patrol car you get the mounted radar, with the gun out you get the gun — a
+-- toggle for that would be a question that never comes up. What a server owner
+-- decides is whether the gun exists at all, and which weapon it rides on.
+Config.Handheld = {
+    Enabled = true,
+
+    -- The weapon that *is* the radar gun. Firing is disabled while it is out,
+    -- so this can safely be a real weapon model; the trigger locks the reading
+    -- instead.
+    --
+    -- Register it in ox_inventory's weapons data to give it out as an item.
+    -- Detection itself does not go through the inventory — it reads the ped's
+    -- selected weapon — so a misconfigured inventory cannot stop the radar
+    -- working, it only stops officers obtaining one.
+    Weapon = 'WEAPON_RAYPISTOL',
+
+    -- Metres. DefaultRange is what a first-time operator gets; Min and Max are
+    -- the ceiling and floor the operator menu moves within, same split as the
+    -- mounted antennas.
+    --
+    -- MaxRange above roughly 300 buys nothing: GTA only keeps vehicles streamed
+    -- to about that distance, so beyond it there is nothing on the client to
+    -- find.
+    DefaultRange = 120.0,
+    MinRange     = 30.0,
+    MaxRange     = 300.0,
+
+    -- Half-angle of the beam, in degrees. A gun is pointed rather than swept,
+    -- so this is narrow — but it is not zero, and it must not be: aiming at a
+    -- car 300m away with an infinitely thin ray would mean hitting a target a
+    -- couple of pixels wide.
+    --
+    -- The operator picks one of these. Narrow separates cars in dense traffic;
+    -- wide is easier to hold on a target at distance. There is no slider
+    -- because there is no meaningful difference between 2.0 and 2.1.
+    ConeAngles   = { 1.2, 2.0, 3.5 },
+    DefaultCone  = 2.0,
+
+    -- Automatic lock, with its own limit and its own slider bounds. It started
+    -- out sharing the mounted radar's threshold on the argument that the speed
+    -- an officer cares about belongs to the officer rather than the instrument.
+    -- That argument holds right up until someone wants a gun on a footpath to
+    -- trip at a different speed from an antenna on a motorway, which is a
+    -- perfectly ordinary thing to want.
+    --
+    -- Unlike the antennas this does not filter to player-driven vehicles. An
+    -- antenna sweeps whatever passes; a gun was pointed at that vehicle on
+    -- purpose.
+    AutoLock = {
+        DefaultOn = false,
+        Default = { mph = 80,  kmh = 130 },
+        Min     = { mph = 20,  kmh = 30  },
+        Max     = { mph = 250, kmh = 300 },
+    },
+}
+
 -- ── Interface ─────────────────────────────────────────────────────────────
 Config.UI = {
     -- Starting positions as a fraction of the screen, {x, y} of the top-left
     -- corner. Both panels can be dragged and the position is remembered per
     -- client, so this only ever affects a first-time operator.
     RadarPos = { x = 0.015, y = 0.30 },
-    PlatePos = { x = 0.015, y = 0.62 },
+    -- The handheld readout. Sits lower and more central than the mounted
+    -- radar: it is read while standing and aiming, not while driving.
+    GunPos   = { x = 0.015, y = 0.62 },
 
     DefaultScale = 1.0,
     MinScale     = 0.7,

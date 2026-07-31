@@ -1,4 +1,4 @@
-# LSN Radar
+# PS Radar
 
 Police radar and plate reader for FiveM, built to sit alongside `ps-mdt` and
 `ps-dispatch` and to look like it belongs to them. Same panel anatomy, same
@@ -10,23 +10,9 @@ in behaviour: strong/fast target splitting, XMIT/HOLD antennas, plate cameras
 with BOLO locking. The implementation, interface and integration surface are
 new.
 
-# Preview
-
-<img src="https://r2.fivemanage.com/image/aQTxYJ0wm59X.png" width="450">
-<img src="https://r2.fivemanage.com/image/zcVFPK2V2Cam.png" width="450">
-<img src="https://r2.fivemanage.com/image/sRQ2RMgJ4aA1.png" width="450">
-<img src="https://r2.fivemanage.com/image/mnjvn9BdRihb.png" width="450">
-<img src="https://r2.fivemanage.com/image/VshJLRo5Apit.png" width="450">
-<img src="https://r2.fivemanage.com/image/fIToS6JSlg4N.png" width="450">
-<img src="https://r2.fivemanage.com/image/zvN6IyvfW1P2.jpg" width="450">
-<img src="https://r2.fivemanage.com/image/AAJxUmo9gyE6.png" width="450">
-<img src="https://r2.fivemanage.com/image/S067FudHnAxy.png" width="450">
-
 # Dependency
 
 - [qb-core](https://github.com/qbcore-framework/qb-core)
-  or
-- [qbx_core](https://github.com/Qbox-project/qbx_core)
 
 Optional, and worth having:
 
@@ -107,6 +93,46 @@ If it is still heavier than you want, the dials in order of effect are
 `Config.Radar.MaxRange` (each metre widens the distance gate), `Config.Radar.Tick`
 (going from 100 to 150ms costs nothing in readability) and
 `Config.Radar.ConeAngle`.
+
+# Two devices
+
+The resource covers a **mounted radar** and a **handheld radar gun**. Which one
+you get is decided by what is in your hands, not by a setting: in a patrol
+vehicle you get the mounted antennas, with the gun drawn you get the gun. A
+toggle for that would be a question that never comes up. What a server owner
+decides is whether the gun exists at all (`Config.Handheld.Enabled`) and which
+weapon it rides on.
+
+The gun does **not** use the sweep. A mounted antenna scans a cone because it
+cannot be pointed; a gun is pointed, so one raycast down the aim vector replaces
+the entire pool walk. It is by some margin the cheaper of the two paths, and it
+never touches `client/scan.lua`.
+
+What both share is everything behind the reading: the MDT lookup and its
+throttling, the watchlist, unit conversion, sound and the target bracket. Two
+lookup paths would have meant two sets of rules quietly disagreeing about how
+often a plate may be asked about.
+
+## Radar gun
+
+Draw the configured weapon and the readout appears. Aim at a vehicle to measure
+it; the target bracket frames whatever is in the crosshair. Pull the trigger to
+lock the reading, pull again to release.
+
+**Firing is disabled while the gun is out** — the weapon is a measuring
+instrument here, and an officer taking a reading must not put a round into the
+car they are measuring. That is also why the trigger is free to be the lock
+button, which is where a real radar gun's lock button is anyway.
+
+Detection reads the ped's selected weapon rather than going through the
+inventory, so a misconfigured inventory cannot stop the radar working — it only
+stops officers obtaining one. Register the weapon in `ox_inventory`'s weapons
+data to hand it out as an item.
+
+The display shows one reading rather than two windows: a gun is pointed at a
+single vehicle, so the strong/fast split that makes a mounted antenna readable
+has nothing to separate. Patrol speed is replaced by the distance to the target,
+which is the number that says whether the reading is one you can stand behind.
 
 # How it works
 
@@ -415,6 +441,24 @@ because "no badge" would otherwise mean both *clean* and *still waiting*.
 If the lookup is denied — an officer whose job is not in the MDT's
 `allowedJobTypes` — the reader says nothing rather than reporting the plate as
 clear.
+
+## Alert cards
+
+A plate check card shows neither a map thumbnail nor a location strip. That
+takes a small change **in ps-dispatch**, not here: two conditions, one in
+`Main.svelte` and one in `CallRow.svelte`, suppressing both when the alert
+carries a `footer`.
+
+Why — `PlateCheckAlert` sends a **targeted** alert, so it reaches
+only the officer who ran the plate, and that officer is standing at the
+location. A map centred on where they already are, above the answer they asked
+for, is the wrong half of the card. ps-dispatch already separates jobs from
+answers internally (an alert carrying a footer is an answer); the card renderer
+just does not act on it yet.
+
+lsn-radar deliberately does **not** resolve or send a street. ps-dispatch already
+does that for its own plate log, which is the one view where "where was that"
+is a real question.
 
 ## Dispatch integration
 

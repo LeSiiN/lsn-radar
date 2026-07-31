@@ -42,8 +42,8 @@ RadarState = {
     settings = {
         range     = prefs.range     or Config.Radar.DefaultRange,
         sound     = boolOr(prefs.sound, Config.Audio.DefaultOn),
-        fastLock  = boolOr(prefs.fastLock, Config.Radar.DefaultFastLock),
-        fastLimit = prefs.fastLimit or Config.Radar.DefaultFastLimit[prefs.unit or Config.DefaultUnit],
+        fastLock  = boolOr(prefs.fastLock, Config.Radar.FastLock.DefaultOn),
+        fastLimit = prefs.fastLimit or Config.Radar.FastLock.Default[prefs.unit or Config.DefaultUnit],
         scale     = prefs.scale     or Config.UI.DefaultScale,
         showPlate = boolOr(prefs.showPlate, true),
         -- Whether the radar was left switched on. Restored on the next patrol
@@ -51,11 +51,21 @@ RadarState = {
         -- decision anybody is making — it is a chore.
         autoPower = boolOr(prefs.autoPower, false),
         marker    = boolOr(prefs.marker, true),
+
+        -- The handheld unit keeps its own scale, range and beam width. It is
+        -- read standing still with the display in the middle of the screen,
+        -- the mounted radar is read at a glance while driving — one scale for
+        -- both would be a compromise that suits neither.
+        gunScale    = prefs.gunScale or Config.UI.DefaultScale,
+        gunRange    = prefs.gunRange or Config.Handheld.DefaultRange,
+        gunCone     = prefs.gunCone or Config.Handheld.DefaultCone,
+        gunAutoLock = boolOr(prefs.gunAutoLock, Config.Handheld.AutoLock.DefaultOn),
+        gunLimit    = prefs.gunLimit or Config.Handheld.AutoLock.Default[prefs.unit or Config.DefaultUnit],
     },
 
     positions = {
         radar = prefs.radarPos or Config.UI.RadarPos,
-        plate = prefs.platePos or Config.UI.PlatePos,
+        gun   = prefs.gunPos or Config.UI.GunPos,
     },
 }
 
@@ -98,10 +108,15 @@ local function persist()
         showPlate = RadarState.settings.showPlate,
         autoPower = RadarState.settings.autoPower,
         marker    = RadarState.settings.marker,
+        gunScale    = RadarState.settings.gunScale,
+        gunRange    = RadarState.settings.gunRange,
+        gunCone     = RadarState.settings.gunCone,
+        gunAutoLock = RadarState.settings.gunAutoLock,
+        gunLimit    = RadarState.settings.gunLimit,
         frontMode = RadarState.antennas.front.mode,
         rearMode  = RadarState.antennas.rear.mode,
         radarPos  = RadarState.positions.radar,
-        platePos  = RadarState.positions.plate,
+        gunPos    = RadarState.positions.gun,
         watch     = PlateState.watch,
     })
 end
@@ -222,13 +237,25 @@ function PushSettingsToNui()
                 maxRange  = Config.Radar.MaxRange,
                 minScale  = Config.UI.MinScale,
                 maxScale  = Config.UI.MaxScale,
-                fastLock  = Config.Radar.AllowFastLock,
+                fastLock  = Config.Radar.FastLock.Allowed,
                 watchlist = Config.PlateReader.AllowWatchlist,
                 maxWatch  = Config.PlateReader.MaxWatchPlates or 20,
                 plates    = Config.PlateReader.Enabled,
                 mdtMode   = Config.PlateReader.Mdt and Config.PlateReader.Mdt.Mode or 'off',
                 preview   = Config.Radar.Preview and Config.Radar.Preview.Enabled or false,
                 marker    = Config.Radar.TargetMarker and Config.Radar.TargetMarker.Enabled or false,
+                gun         = Config.Handheld and Config.Handheld.Enabled or false,
+                gunMinRange = Config.Handheld.MinRange,
+                gunMaxRange = Config.Handheld.MaxRange,
+                gunCones    = Config.Handheld.ConeAngles,
+
+                -- Slider ends for both limits, for the unit currently selected.
+                -- Sent rather than hardcoded in the interface: what counts as a
+                -- speed worth locking is a property of the server's roads.
+                limitMin    = Config.Radar.FastLock.Min[RadarState.unit],
+                limitMax    = Config.Radar.FastLock.Max[RadarState.unit],
+                gunLimitMin = Config.Handheld.AutoLock.Min[RadarState.unit],
+                gunLimitMax = Config.Handheld.AutoLock.Max[RadarState.unit],
             },
             keys = Config.Keys,
         },
@@ -287,7 +314,11 @@ function ToggleRadarPower()
 end
 
 function OpenRemote()
-    if remoteOpen or not RadarState.visible then return end
+    -- Either device counts. Gating this on the vehicle radar meant an officer
+    -- on foot with the gun in hand could not reach a single setting, including
+    -- the ones for the gun.
+    if remoteOpen then return end
+    if not RadarState.visible and not (HandheldState and HandheldState.active) then return end
     remoteOpen = true
     SetNuiFocus(true, true)
     PushSettingsToNui()
@@ -346,7 +377,7 @@ end)
 ---@param handler function
 local function bind(name, description, defaultKey, handler)
     RegisterCommand(name, function()
-        if not RadarState.visible then return end
+        if not RadarState.visible and not (HandheldState and HandheldState.active) then return end
         -- Key lock exists so the radar's keys stop fighting with everything
         -- else bound to the numpad. It deliberately does not block its own
         -- release key.
@@ -541,9 +572,10 @@ RegisterNUICallback('setting', function(data, cb)
 
     if key == 'unit' and (value == 'mph' or value == 'kmh') then
         RadarState.unit = value
-        -- The fast limit is a speed, so it has to move with the unit or the
+        -- Both limits are speeds, so they have to move with the unit or the
         -- operator silently ends up with a 130 mph trigger.
-        s.fastLimit = Config.Radar.DefaultFastLimit[value]
+        s.fastLimit = Config.Radar.FastLock.Default[value]
+        s.gunLimit  = Config.Handheld.AutoLock.Default[value]
     elseif key == 'range' then
         s.range = math.max(Config.Radar.MinRange, math.min(Config.Radar.MaxRange, tonumber(value) or s.range))
         -- Show the cone in the world for as long as the slider keeps moving.
@@ -555,11 +587,31 @@ RegisterNUICallback('setting', function(data, cb)
     elseif key == 'fastLock' then
         s.fastLock = value and true or false
     elseif key == 'fastLimit' then
-        s.fastLimit = math.max(1, tonumber(value) or s.fastLimit)
+        local fl = Config.Radar.FastLock
+        s.fastLimit = math.max(fl.Min[RadarState.unit],
+                       math.min(fl.Max[RadarState.unit], tonumber(value) or s.fastLimit))
+    elseif key == 'gunLimit' then
+        local al = Config.Handheld.AutoLock
+        s.gunLimit = math.max(al.Min[RadarState.unit],
+                      math.min(al.Max[RadarState.unit], tonumber(value) or s.gunLimit))
     elseif key == 'showPlate' then
         s.showPlate = value and true or false
     elseif key == 'marker' then
         s.marker = value and true or false
+    elseif key == 'gunScale' then
+        s.gunScale = math.max(Config.UI.MinScale, math.min(Config.UI.MaxScale, tonumber(value) or s.gunScale))
+    elseif key == 'gunRange' then
+        local h = Config.Handheld
+        s.gunRange = math.max(h.MinRange, math.min(h.MaxRange, tonumber(value) or s.gunRange))
+    elseif key == 'gunCone' then
+        -- Only the offered widths, so a crafted NUI message cannot hand
+        -- somebody a 90 degree beam that reads the whole street at once.
+        local wanted = tonumber(value)
+        for i = 1, #Config.Handheld.ConeAngles do
+            if Config.Handheld.ConeAngles[i] == wanted then s.gunCone = wanted break end
+        end
+    elseif key == 'gunAutoLock' then
+        s.gunAutoLock = value and true or false
     end
 
     persist()
@@ -569,7 +621,7 @@ RegisterNUICallback('setting', function(data, cb)
 end)
 
 RegisterNUICallback('savePosition', function(data, cb)
-    if data.panel == 'radar' or data.panel == 'plate' then
+    if data.panel == 'radar' or data.panel == 'gun' then
         RadarState.positions[data.panel] = { x = data.x, y = data.y }
         persist()
     end
@@ -583,7 +635,7 @@ end)
 
 RegisterNUICallback('resetLayout', function(_, cb)
     RadarState.positions.radar = Config.UI.RadarPos
-    RadarState.positions.plate = Config.UI.PlatePos
+    RadarState.positions.gun   = Config.UI.GunPos
     RadarState.settings.scale  = Config.UI.DefaultScale
     persist()
     PushSettingsToNui()

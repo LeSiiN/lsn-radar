@@ -1,6 +1,6 @@
 <script lang="ts">
   import { SendNUI } from "@utils/SendNUI";
-  import { RADAR, PLATES, CONFIG } from "@store/stores";
+  import { RADAR, PLATES, CONFIG, HANDHELD } from "@store/stores";
   import type { Unit, AntennaMode, Cam } from "@typings/type";
 
   let watchDraft = "";
@@ -15,6 +15,20 @@
 
   const UNITS: Unit[] = ["kmh", "mph"];
   const SCALES = [0.7, 0.85, 1.0, 1.15, 1.4];
+
+  const CONE_LABELS: Record<string, string> = {
+    narrow: "Narrow",
+    normal: "Normal",
+    wide: "Wide",
+  };
+
+  // Three offered widths, labelled by what they are for rather than by their
+  // angle. "1.2°" tells an operator nothing; "picks one car out of traffic"
+  // is the actual decision.
+  $: coneOptions = (limits.gunCones ?? []).map((a, i) => ({
+    angle: a,
+    label: [CONE_LABELS.narrow, CONE_LABELS.normal, CONE_LABELS.wide][i] ?? String(a),
+  }));
 
   const ANTENNAS: { id: Cam; label: string }[] = [
     { id: "front", label: "Front antenna" },
@@ -231,17 +245,23 @@
         <div class="rd-form-group">
           <span class="rd-form-label">Lock above</span>
           <div class="rd-row">
+            <!-- Ends come from the config, per unit. They used to be written
+                 into this file, which meant the band a server considered
+                 interesting was decided by whoever wrote the slider. -->
             <input
               class="rd-range"
               type="range"
-              min="20"
-              max={$RADAR.unit === "mph" ? 140 : 220}
+              min={limits.limitMin}
+              max={limits.limitMax}
               step="5"
               value={s.fastLimit}
               on:input={(e) => set("fastLimit", +e.currentTarget.value)}
             />
             <span class="rd-range-value">{s.fastLimit} {$RADAR.unit}</span>
           </div>
+          <span class="rd-form-hint">
+            Between {limits.limitMin} and {limits.limitMax} {$RADAR.unit}.
+          </span>
         </div>
       {/if}
     {/if}
@@ -374,6 +394,112 @@
       ></button>
     </div>
 
+    {#if limits.gun}
+      <div class="rd-divider"></div>
+
+      <div class="rd-row rd-row--between">
+        <span class="rd-form-label">Radar gun</span>
+        <span class="rd-badge" class:rd-badge--blue={$HANDHELD.active}>
+          {$HANDHELD.active ? "In hand" : "Stowed"}
+        </span>
+      </div>
+
+      <!-- Its own everything. The gun is read standing still with the display
+           in the middle of the screen; the mounted radar is read at a glance
+           while driving. One set of numbers for both would suit neither. -->
+      <div class="rd-form-group">
+        <span class="rd-form-label">Beam width</span>
+        <div class="rd-steps">
+          {#each coneOptions as c}
+            <button
+              class="rd-step"
+              class:rd-step--active={Math.abs((s.gunCone ?? 0) - c.angle) < 0.01}
+              on:click={() => set("gunCone", c.angle)}
+            >{c.label}</button>
+          {/each}
+        </div>
+        <span class="rd-form-hint">
+          Narrow separates cars in dense traffic; wide is easier to hold on a
+          target at distance.
+        </span>
+      </div>
+
+      <div class="rd-form-group">
+        <span class="rd-form-label">Gun range</span>
+        <div class="rd-row">
+          <input
+            class="rd-range"
+            type="range"
+            min={limits.gunMinRange}
+            max={limits.gunMaxRange}
+            step="10"
+            value={s.gunRange}
+            on:input={(e) => set("gunRange", +e.currentTarget.value)}
+          />
+          <span class="rd-range-value">{Math.round(s.gunRange ?? 0)} m</span>
+        </div>
+        <span class="rd-form-hint">
+          Past roughly 300m there is nothing to find — the game only keeps
+          vehicles loaded that far.
+        </span>
+      </div>
+
+      <div class="rd-row rd-row--between">
+        <div>
+          <div class="rd-form-label">Gun auto-lock</div>
+          <div class="rd-form-hint">Locks the moment a reading passes the limit</div>
+        </div>
+        <button
+          class="rd-toggle"
+          class:rd-toggle--on={s.gunAutoLock}
+          on:click={() => set("gunAutoLock", !s.gunAutoLock)}
+          aria-label="Toggle gun auto-lock"
+        ></button>
+      </div>
+
+      {#if s.gunAutoLock}
+        <div class="rd-form-group">
+          <span class="rd-form-label">Gun locks above</span>
+          <div class="rd-row">
+            <input
+              class="rd-range"
+              type="range"
+              min={limits.gunLimitMin}
+              max={limits.gunLimitMax}
+              step="5"
+              value={s.gunLimit}
+              on:input={(e) => set("gunLimit", +e.currentTarget.value)}
+            />
+            <span class="rd-range-value">{s.gunLimit} {$RADAR.unit}</span>
+          </div>
+          <span class="rd-form-hint">
+            Its own limit, between {limits.gunLimitMin} and {limits.gunLimitMax}
+            {$RADAR.unit} — a gun on a footpath and an antenna on a motorway do
+            not have to trip at the same speed. Unlike the antennas this does not
+            skip NPC traffic: you aimed at it.
+          </span>
+        </div>
+      {/if}
+
+      <div class="rd-form-group">
+        <span class="rd-form-label">Gun display scale</span>
+        <div class="rd-steps">
+          {#each SCALES as sc}
+            <button
+              class="rd-step"
+              class:rd-step--active={Math.abs((s.gunScale ?? 1) - sc) < 0.01}
+              disabled={sc < limits.minScale || sc > limits.maxScale}
+              on:click={() => set("gunScale", sc)}
+            >{Math.round(sc * 100)}%</button>
+          {/each}
+        </div>
+        <span class="rd-form-hint">
+          Drag the readout with this panel open, same as the mounted radar. Its
+          position is stored separately.
+        </span>
+      </div>
+    {/if}
+
     <div class="rd-divider"></div>
 
     <div class="rd-form-group">
@@ -389,7 +515,8 @@
         {/each}
       </div>
       <span class="rd-form-hint">
-        While this panel is open the radar can be dragged anywhere on screen.
+        Applies to the mounted radar. While this panel is open it can be dragged
+        anywhere on screen.
         It is also visible while this panel is open even when switched off, so
         there is something to aim at.
       </span>
