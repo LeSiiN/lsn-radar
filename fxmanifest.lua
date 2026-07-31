@@ -4,7 +4,7 @@ game "gta5"
 
 author "LeSiiN"
 description "Police radar and plate reader, styled to match ps-mdt and ps-dispatch"
-version "1.0.0"
+version "1.0.6"
 
 lua54 "yes"
 
