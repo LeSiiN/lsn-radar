@@ -100,6 +100,7 @@ That is the mounted radar working. The gun needs a few more steps.
 ---
 
 ## Setting up the radar gun
+> IMPORTANT: IF U USE ROBBERY SCRIPT OR CAR ROBBERY SCRIPT THAT LETS U ROB NPCS WITH A GUN OUT, ADD `WEAPON_RAYPISTOL` AS A WHITELIST WEAPON.
 
 Five steps, roughly ten minutes.
 
