@@ -6,11 +6,12 @@
     PLATES,
     CONFIG,
     HANDHELD,
+    HISTORY,
     SHOW_RADAR,
     REMOTE_OPEN,
     COPIED,
   } from "@store/stores";
-  import type { RadarData, PlateData, SettingsPayload, HandheldData } from "@typings/type";
+  import type { RadarData, PlateData, SettingsPayload, HandheldData, HistoryData } from "@typings/type";
 
   ReceiveNUI<RadarData>("radar", (data) => {
     RADAR.set(data);
@@ -22,6 +23,10 @@
 
   ReceiveNUI<HandheldData>("handheld", (data) => {
     HANDHELD.set(data);
+  });
+
+  ReceiveNUI<HistoryData>("history", (data) => {
+    HISTORY.set(data);
   });
 
   ReceiveNUI<SettingsPayload>("settings", (data) => {
@@ -79,7 +84,7 @@
         watch: ["46EEK872", "68HBW691"],
         limits: {
           minRange: 50, maxRange: 350, minScale: 0.7, maxScale: 1.4,
-          fastLock: true, watchlist: true, maxWatch: 20, plates: true, mdtMode: "alert", preview: true, marker: true, gun: true, gunMinRange: 30, gunMaxRange: 300, gunCones: [1.2, 2, 3.5], limitMin: 30, limitMax: 400, gunLimitMin: 30, gunLimitMax: 400,
+          fastLock: true, watchlist: true, maxWatch: 20, plates: true, mdtMode: "alert", preview: true, marker: true, history: true, gun: true, gunMinRange: 30, gunMaxRange: 300, gunCones: [1.2, 2, 3.5], limitMin: 30, limitMax: 400, gunLimitMin: 30, gunLimitMax: 400,
         },
         keys: {
           Remote: "NUMPAD7", KeyLock: "L", FrontAnt: "NUMPAD8",

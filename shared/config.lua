@@ -98,6 +98,33 @@ Config.Radar = {
     -- gone does not linger. 0 disables it and restores the old behaviour.
     ReadingHold = 600,
 
+    -- ── Lock history ─────────────────────────────────────────────────────
+    -- Every lock is recorded, so a measurement taken twenty minutes ago is
+    -- still there when the officer sits down to write it up. Without this each
+    -- new lock overwrote the last one, and an officer who stopped three cars in
+    -- a row had the numbers for one of them.
+    LockHistory = {
+        Enabled = true,
+
+        -- Entries kept, newest first. A list this short is deliberate: it is a
+        -- notepad for the current shift, not a records system. Anything worth
+        -- keeping longer belongs in a citation in the MDT.
+        Size = 12,
+
+        -- Keep the list across sessions. An officer who logs out mid-shift and
+        -- comes back to write reports still has their readings.
+        --
+        -- Stored per client in KVP alongside the other preferences. No server
+        -- round trip, because these are notes rather than evidence — nothing
+        -- downstream should be trusting a number a client kept in a file it
+        -- controls.
+        Persist = true,
+
+        -- Drop entries older than this many hours on load. A reading from three
+        -- days ago is not a note any more, it is clutter.
+        MaxAgeHours = 12,
+    },
+
     -- ── Target bracket ───────────────────────────────────────────────────
     -- A viewfinder bracket around the vehicle being read, so "which one of
     -- those is it?" stops being a guess.
@@ -223,11 +250,16 @@ Config.Handheld = {
     -- The weapon stays as the trigger but is made invisible, and this model is
     -- attached to the hand in its place.
     --
+    -- would have to be rebuilt out of keypresses. Hiding it costs one native.
+    --
     -- The model is streamed by whichever resource owns it — bzzz_pdradar for
     -- this one. Do NOT copy the .ydr/.ytyp in here as well: loading the same
     -- DLC_ITYP_REQUEST twice stops the props working, which the pack's own
     -- readme warns about.
-
+    --
+    -- Offsets come from the pack's dpemotes example and are tuned for a
+    -- pistol-style grip. A weapon whose hand pose differs will need them
+    -- nudged; that is why they are here rather than in the code.
     Prop = {
         Enabled  = true,
         Model    = 'bzzz_police_prop_radar_a',

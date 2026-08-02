@@ -244,6 +244,7 @@ function PushSettingsToNui()
                 mdtMode   = Config.PlateReader.Mdt and Config.PlateReader.Mdt.Mode or 'off',
                 preview   = Config.Radar.Preview and Config.Radar.Preview.Enabled or false,
                 marker    = Config.Radar.TargetMarker and Config.Radar.TargetMarker.Enabled or false,
+                history   = Config.Radar.LockHistory and Config.Radar.LockHistory.Enabled ~= false,
                 gun         = Config.Handheld and Config.Handheld.Enabled or false,
                 gunMinRange = Config.Handheld.MinRange,
                 gunMaxRange = Config.Handheld.MaxRange,
@@ -296,6 +297,7 @@ function ToggleRadarPower()
 
     if not RadarState.power then
         for _, a in pairs(RadarState.antennas) do
+            if a.lock then CloseHistoryEntry(a.lock) end
             a.strong, a.fast, a.lock, a.frozen = nil, nil, nil, nil
         end
         for _, c in pairs(PlateState.cameras) do
@@ -530,6 +532,7 @@ function ReleaseLock(cam)
     local a = RadarState.antennas[cam]
     if not a or not a.lock then return end
 
+    CloseHistoryEntry(a.lock)
     a.lock, a.frozen = nil, nil
     a.strong, a.fast = nil, nil
     UnpinCamera(cam)
@@ -633,6 +636,16 @@ RegisterNUICallback('previewRange', function(_, cb)
     cb('ok')
 end)
 
+RegisterNUICallback('removeHistory', function(data, cb)
+    RemoveHistoryEntry(tonumber(data and data.id))
+    cb('ok')
+end)
+
+RegisterNUICallback('clearHistory', function(_, cb)
+    ClearLockHistory()
+    cb('ok')
+end)
+
 RegisterNUICallback('resetLayout', function(_, cb)
     RadarState.positions.radar = Config.UI.RadarPos
     RadarState.positions.gun   = Config.UI.GunPos
@@ -724,6 +737,8 @@ end)
 
 CreateThread(function()
     Wait(500)
+    LoadLockHistory()
+    PushHistoryToNui()
     PushSettingsToNui()
     PushRadarToNui(true)
     PushPlatesToNui()

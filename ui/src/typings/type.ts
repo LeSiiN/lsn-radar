@@ -96,6 +96,28 @@ export interface HandheldData {
   reason?: string | null;
 }
 
+export interface HistoryEntry {
+  id: number;
+  speed: number;
+  peak: number;
+  unit: Unit;
+  plate?: string | null;
+  index?: number | null;
+  dir?: Direction | null;
+  /** Which device took it: an antenna, or the handheld unit. */
+  source: "front" | "rear" | "gun";
+  auto: boolean;
+  /** In-game clock at the moment of the lock. */
+  clock: string;
+  /** Wall clock, for ageing entries out. */
+  epoch: number;
+}
+
+export interface HistoryData {
+  enabled: boolean;
+  entries: HistoryEntry[];
+}
+
 export interface Settings {
   range: number;
   sound: boolean;
@@ -127,6 +149,7 @@ export interface Limits {
   mdtMode: "alert" | "lookup" | "off";
   preview: boolean;
   marker: boolean;
+  history: boolean;
   gun: boolean;
   gunMinRange: number;
   gunMaxRange: number;

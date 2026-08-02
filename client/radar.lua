@@ -139,6 +139,8 @@ function LockAntenna(antenna, target, source, auto)
         PinCameraToPlate(antenna.cam, target.plate, target.plateIndex)
     end
 
+    RecordLock(antenna.lock, antenna.cam or source)
+
     PlayRadarSound('Lock', 250)
 
     if not auto then return end
@@ -279,6 +281,7 @@ local function applyToAntenna(antenna, list, count, patrolVeh)
     -- Timed release, when the server owner has configured one.
     local hold = Config.Radar.LockHold
     if hold > 0 and antenna.lock and (GetGameTimer() - antenna.lock.at) > hold * 1000 then
+        CloseHistoryEntry(antenna.lock)
         antenna.lock, antenna.frozen = nil, nil
     end
 end
@@ -323,6 +326,10 @@ CreateThread(function()
                 -- The cameras read from the same sweep rather than walking the
                 -- pool again on their own timer.
                 if wantPlates then CommitPlates(patrolVeh) end
+
+                -- A tracking lock keeps climbing, so its history entry has to
+                -- keep up. Cheap: it only writes when a peak actually moved.
+                RefreshLiveHistory()
 
                 PushRadarToNui()
             end

@@ -247,6 +247,7 @@ local function toggleLock()
     local h = HandheldState
 
     if h.lock then
+        CloseHistoryEntry(h.lock)
         h.lock = nil
         clearReading()
         PlayRadarSound('Blip', 150)
@@ -260,6 +261,7 @@ local function toggleLock()
         speed = h.speed, plate = h.plate, index = h.index,
         dir = h.dir, dist = h.dist, at = GetGameTimer(),
     }
+    RecordLock(h.lock, 'gun')
     PlayRadarSound('Lock', 250)
     push(true)
 
@@ -384,6 +386,7 @@ local function measure()
             speed = speed, plate = plate, index = h.index,
             dir = h.dir, dist = h.dist, at = GetGameTimer(), auto = true,
         }
+        RecordLock(h.lock, 'gun')
         PlayRadarSound('Lock', 250)
         TriggerServerEvent('lsn-radar:server:speedLocked', speed, RadarState.unit, plate)
         push(true)

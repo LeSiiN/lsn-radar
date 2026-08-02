@@ -1,6 +1,7 @@
 <script lang="ts">
+  import History from "@components/History.svelte";
   import { SendNUI } from "@utils/SendNUI";
-  import { RADAR, PLATES, CONFIG, HANDHELD } from "@store/stores";
+  import { RADAR, PLATES, CONFIG, HANDHELD, HISTORY } from "@store/stores";
   import type { Unit, AntennaMode, Cam } from "@typings/type";
 
   // Three tabs, not two. Units, sound, key reference and the interface scale
@@ -10,7 +11,7 @@
   //
   // The tab opens on whichever device is actually in hand, because that is
   // overwhelmingly the one being adjusted.
-  type Tab = "vehicle" | "gun" | "general";
+  type Tab = "vehicle" | "gun" | "history" | "general";
   let tab: Tab = "vehicle";
   let touched = false;
 
@@ -111,6 +112,15 @@
       <button class="rd-tab" class:rd-tab--active={tab === "gun"} on:click={() => pick("gun")}>
         <i class="fas fa-gauge-high"></i> Gun
         {#if $HANDHELD.active}<span class="rd-tab-dot"></span>{/if}
+      </button>
+    {/if}
+
+    {#if limits.history}
+      <button class="rd-tab" class:rd-tab--active={tab === "history"} on:click={() => pick("history")}>
+        <i class="fas fa-clock-rotate-left"></i> Log
+        {#if ($HISTORY.entries?.length ?? 0) > 0}
+          <span class="rd-count">{$HISTORY.entries.length}</span>
+        {/if}
       </button>
     {/if}
 
@@ -388,6 +398,9 @@
         </div>
         <span class="rd-form-hint">Its position is stored separately from the mounted radar.</span>
       </div>
+
+    {:else if tab === "history"}
+      <History />
 
     {:else}
       <div class="rd-form-group">

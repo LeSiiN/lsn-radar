@@ -17,6 +17,7 @@ client_script {
   "client/utils.lua",
   "client/main.lua",
   "client/scan.lua",
+  "client/history.lua",
   "client/radar.lua",
   "client/plates.lua",
   "client/handheld.lua",

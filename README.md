@@ -133,6 +133,9 @@ prop is attached in its place.
 Config.Handheld.Weapon = 'WEAPON_RAYPISTOL'
 ```
 
+tuned for a pistol grip, so a weapon with a different hand pose will need them
+adjusted in step 5.
+
 Firing is disabled whenever it is out, so this being a real weapon is not a
 risk — an officer taking a reading cannot put a round into the car.
 
@@ -245,6 +248,41 @@ rather than pretending to be current.
 Release with the same antenna key that toggles XMIT/HOLD, or the button in the
 control panel.
 
+### The log
+
+Every lock is recorded, from both devices, and the list lives in the **Log** tab.
+Before this each lock overwrote the last: an officer who stopped three cars in a
+row had the numbers for one of them.
+
+Each entry carries the locked speed, the peak if the target was ever faster, the
+plate with its artwork, which device took it, and the in-game clock. The copy
+button next to a row puts a line on the clipboard ready to paste:
+
+```
+141 kmh, peak 178 kmh, plate 46EEK872, Front antenna, at 21:04
+```
+
+That is the gap this closes. It was never that old readings were invisible — it
+was that turning one into a citation meant retyping a speed and eight plate
+characters off a screenshot, which is where transcription errors come from.
+
+Two details worth knowing. The entry is written when the lock is **taken**, not
+when it is released, because a pursuit that ends in an arrest is exactly the
+case where nobody gets round to clearing the lock. And the peak keeps updating
+after the entry exists — a tracking lock climbs with the driver, so the number
+that matters is not the one at the instant the trigger was pulled. It freezes
+when the lock ends.
+
+The list holds twelve entries, oldest dropping off, and survives a relog. Older
+than `MaxAgeHours` and an entry is dropped on load: a reading from three days
+ago is not a note any more, it is clutter. It is stored per client in KVP and
+deliberately never sent to the server — these are notes, not evidence, and
+nothing downstream should trust a number a client kept in a file it controls.
+
+```lua
+exports['lsn-radar']:GetLockHistory()
+```
+
 ### Plates and the watchlist
 
 Plates read under each antenna are checked against the MDT automatically. Hits
@@ -292,6 +330,14 @@ Everything a server owner decides is in `shared/config.lua`. Everything an
 operator can change is in the control panel and stored per client. The split
 matters: config values are the ceiling, the operator menu moves within them.
 
+The panel has three tabs — **Vehicle**, **Gun** and **General**. The first two
+are each device's own settings; the third holds what belongs to neither on its
+own: units, sound, the target bracket, the watchlist and the key reference. A
+green dot marks the device actually in use, and the panel opens on that tab,
+since it is overwhelmingly the one being adjusted. Picking a tab by hand stops
+the auto-switching for that session — moving the panel under someone who is
+mid-adjustment is worse than opening on the wrong tab.
+
 ### Access
 
 | Option | Effect |
@@ -312,6 +358,7 @@ check is what keeps a paramedic out of the radar, so keep `Config.Jobs` tight.
 | `Config.Radar.Tick` | 100ms. Going to 150 costs nothing in readability. |
 | `Config.Radar.ReadingHold` | How long a reading survives a tick that found nothing. |
 | `Config.Radar.FastLock` | Auto-lock: allowed, default, and slider ends per unit. |
+| `Config.Radar.LockHistory` | The log: size, persistence, and how long an entry stays a note. |
 | `Config.Radar.TargetMarker` | The bracket around the measured vehicle. |
 | `Config.Radar.Preview` | The cone drawn on the road while adjusting range. |
 
