@@ -272,6 +272,7 @@ Config.Handheld = {
         DefaultOn = false,
         Default = { mph = 80,  kmh = 130 },
         Min     = { mph = 20,  kmh = 30  },
+        Max     = { mph = 250, kmh = 400 },
     },
 }
 

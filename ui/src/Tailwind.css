@@ -557,11 +557,21 @@ html, body {
    middle of the screen would hide exactly the thing being adjusted. */
 .rd-remote {
     position: fixed;
-    top: 50%;
+    /* Anchored by its top edge, not centred.
+       `top: 50%` with `translateY(-50%)` keeps the *middle* of the panel in
+       place, so switching to a shorter tab pushed the top edge down and the
+       header appeared to slide — the tab strip you just clicked moved out from
+       under the cursor. Pinning the top instead means the header and tabs stay
+       exactly where they are and only the content below them changes height. */
+    top: 19vh;
     right: 24px;
-    transform: translateY(-50%);
     width: 340px;
-    max-height: 84vh;
+    /* Was 84vh, which on most screens meant a panel running from the top edge
+       to the bottom — a wall of controls rather than a menu. Splitting the
+       contents across tabs is what makes this height possible: each tab now
+       holds about a screenful less than the single list did.
+       19vh top + 62vh height leaves the panel visually centred at rest. */
+    max-height: 62vh;
     display: flex;
     flex-direction: column;
     background: rgba(26, 28, 33, 0.97);
@@ -747,4 +757,51 @@ html, body {
     font-weight: 700;
     line-height: 15px;
     text-align: center;
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────────────────
+   Same construction as ps-dispatch's menu tabs, which in turn follow the MDT
+   roster: uppercase label, icon, 2px underline that lights on the active one.
+   Adopted verbatim rather than reinvented — three panels in one server that
+   almost match is worse than three that do. */
+.rd-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    flex-shrink: 0;
+}
+.rd-tab {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.rd-tab:hover { color: rgba(255, 255, 255, 0.6); }
+.rd-tab--active {
+    color: rgba(125, 211, 252, 0.9);
+    border-bottom-color: rgba(56, 189, 248, 0.55);
+}
+/* Marks the device actually in use, so an officer holding the gun can see at a
+   glance which tab is describing what is in their hands. */
+.rd-tab-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 5px rgba(74, 222, 128, 0.6);
+    flex-shrink: 0;
 }
