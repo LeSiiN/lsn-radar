@@ -181,9 +181,37 @@ Config.PlateReader = {
 
     Tick = 250,
 
-    -- A plate has to stay in view this long before it is considered read. Stops
-    -- the display from strobing through every car in oncoming traffic.
-    DwellTime = 350,
+    -- How long a plate must hold still before it counts as read.
+    --
+    -- Deliberately short. It was 350ms, chosen to stop the window strobing
+    -- through oncoming traffic, and it did — along with every vehicle that
+    -- passed quickly enough not to be the nearest thing for a third of a
+    -- second, which on a road with traffic moving is most of them. The job of
+    -- not strobing belongs to HoldMs below, where it can be done without
+    -- discarding readings.
+    --
+    -- What remains here is a guard against a plate that was never really in
+    -- view: one frame of a car clipping the edge of the cone.
+    --
+    -- Kept just under one sweep interval (Config.Radar.Tick) on purpose. The
+    -- check is really "seen on two consecutive sweeps", and because time is
+    -- sampled in whole ticks, any value at or above the interval quietly
+    -- becomes three — which put a fast car back out of reach for the sake of a
+    -- number that looked more cautious.
+    DwellTime = 90,
+
+    -- How long a plate stays on the display once read, in ms.
+    --
+    -- This is what actually stops the strobing: while a reading is held, a
+    -- newer plate does not replace it and the window does not blank when the
+    -- vehicle leaves. Two things follow from that, both wanted — a car that
+    -- passes at speed leaves its plate on screen long enough to be read, and a
+    -- stream of oncoming traffic produces a readable sequence rather than a
+    -- flicker.
+    --
+    -- Long enough to read eight characters and glance away; short enough that
+    -- the reader still feels live.
+    HoldMs = 2200,
 
     -- The operator's own watchlist: plates they have decided to watch for, kept
     -- separate from the MDT's records. Real BOLOs need no entry here — the MDT
