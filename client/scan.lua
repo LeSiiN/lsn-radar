@@ -32,11 +32,66 @@
 --- handles are caught by the existence check when they are used.
 local pool = {}
 local poolAt = 0
+
+--- How long the vehicle list is reused before being fetched again.
+---
+--- Briefly raised to 2000ms so the skip table below could bank more than five
+--- ticks. That was wrong, and badly so: in dense traffic vehicles stream in
+--- constantly, and a car that appeared right in front of the patrol vehicle
+--- stayed invisible to the sweep for up to two seconds. Since that is precisely
+--- the car whose plate an officer wants, the plate row went blank exactly when
+--- there was most to read.
+---
+--- 500ms is the ceiling here. The skip table gets less out of it, and that is
+--- the correct trade: skipping is an optimisation, seeing the vehicle in front
+--- of you is the job.
 local POOL_TTL = 500
 
 --- Whether an entity is a class the radar reads. Keyed by handle and dropped
 --- with the pool, so a recycled handle cannot inherit an answer.
 local readable = {}
+
+--- Vehicles too far away to matter yet, with the tick they become worth looking
+--- at again.
+---
+--- This is the one remaining reduction available on the hot path. Every
+--- candidate costs a GetEntityCoords before its distance can be judged, and on
+--- a busy street most of the pool is hundreds of metres away — so the majority
+--- of the work is reading positions in order to throw them away.
+---
+--- A vehicle 500m out cannot reach a 250m cone in a tenth of a second: that
+--- would need a closing rate of 2,500 m/s. So the surplus distance buys a
+--- number of ticks it can safely be ignored for, computed from a closing rate
+--- no pair of vehicles in this game can exceed.
+---
+--- Cleared with the pool every 500ms, which caps a skip at five ticks. That
+--- still removes about two thirds of the position reads on a busy street, and
+--- keeping it longer is not worth what it costs — see POOL_TTL above.
+local skipUntil = {}
+local tickNo = 0
+
+--- Line of sight per entity. A raycast is the most expensive thing on this
+--- path — up to six a tick once traffic is in the cones, which is exactly when
+--- the frame budget is under pressure.
+---
+--- 250ms is chosen against what the answer is worth: a target that ducks behind
+--- a lorry is hidden for far longer than that, so nothing visibly lingers,
+--- while one held steadily in the open stops paying for a ray it has already
+--- passed four times.
+local losCache = {}
+local LOS_TTL = 250
+
+--- Plate text and driver per entity. A vehicle's plate does not change, and
+--- whether a real player is driving changes rarely enough that a second is
+--- nothing. Without it the winning target paid three natives every tick to be
+--- told what it was told a tenth of a second earlier.
+local infoCache = {}
+local INFO_TTL = 1000
+
+--- Assumed worst-case closing rate in m/s, patrol and target combined.
+--- Generously above anything drivable — the cost of overestimating is a few
+--- wasted coordinate reads, while underestimating would mean missing a car.
+local MAX_CLOSING = 220.0
 
 local function refreshPool()
     local now = GetGameTimer()
@@ -45,7 +100,17 @@ local function refreshPool()
     poolAt = now
     pool = GetGamePool('CVehicle')
 
+    -- Both caches are keyed by entity handle, and handles get recycled. Cleared
+    -- together with the pool so a new vehicle cannot inherit an old one's
+    -- answer — a wrongly inherited skip would be a car the radar never sees,
+    -- which is the worst failure this whole file can produce.
+    -- All four are keyed by entity handle, and handles get recycled onto
+    -- different vehicles. Cleared together with the pool so nothing can inherit
+    -- an answer that belonged to a car that is gone.
     for k in pairs(readable) do readable[k] = nil end
+    for k in pairs(skipUntil) do skipUntil[k] = nil end
+    for k in pairs(losCache) do losCache[k] = nil end
+    for k in pairs(infoCache) do infoCache[k] = nil end
 end
 
 --- The cached vehicle list, for consumers outside the sweep. The handheld unit
@@ -147,13 +212,41 @@ function RunSweep(patrolVeh, wantPlates)
     local bestFront, bestFrontDist
     local bestRear, bestRearDist
 
+    tickNo = tickNo + 1
+
+    -- Metres a pair of vehicles can close between two sweeps. Anything further
+    -- outside the range than this is provably irrelevant for at least one tick.
+    local perTick = MAX_CLOSING * (Config.Radar.Tick / 1000.0)
+    local maxRange = math.sqrt(maxSq)
+
     for i = 1, #pool do
         local veh = pool[i]
+        local skip = skipUntil[veh]
+
+        if skip and skip > tickNo then
+            -- Known to be far away and not yet able to have arrived. Costs one
+            -- table lookup instead of an existence check and a position read.
+            goto continue
+        end
 
         if veh ~= patrolVeh and DoesEntityExist(veh) then
+            -- Verified on every read rather than trusted from the cache: a
+            -- handle can be recycled onto a different vehicle inside the pool's
+            -- lifetime, and an inherited skip would be a car the radar never
+            -- sees. One cheap native to rule that out.
             local c = GetEntityCoords(veh)
             local dx, dy, dz = c.x - px, c.y - py, c.z - pz
             local distSq = dx * dx + dy * dy + dz * dz
+
+            -- Bank the surplus distance as ticks that can be skipped. Only for
+            -- vehicles comfortably outside: a car just past the edge is one the
+            -- operator is about to be interested in.
+            if distSq > maxSq then
+                local surplus = math.sqrt(distSq) - maxRange
+                if surplus > perTick then
+                    skipUntil[veh] = tickNo + math.floor(surplus / perTick)
+                end
+            end
 
             -- Distance first. Most of the world fails here, and failing here is
             -- the cheapest failure available.
@@ -226,6 +319,8 @@ function RunSweep(patrolVeh, wantPlates)
                 end
             end
         end
+
+        ::continue::
     end
 
     Sweep.front, Sweep.rear = scratch.front, scratch.rear
@@ -233,31 +328,64 @@ function RunSweep(patrolVeh, wantPlates)
     Sweep.plateFront, Sweep.plateRear = bestFront, bestRear
 end
 
---- Fill in the fields that were skipped during the sweep.
----
---- Called for a candidate only once it has won a window, which is what keeps
---- the plate read and the driver lookup off the hot path — in traffic those two
---- natives per vehicle per tick were most of the cost of knowing things nobody
---- ever looked at.
----@param c table
-function ResolveCandidate(c)
-    if c.resolved then return c end
-    c.resolved = true
-    c.plate = GetCleanPlate(c.entity)
-    -- Carried so a lock can pin the plate *with* its design. Without it the
-    -- pinned row falls back to a plain badge and the artwork disappears the
-    -- moment the plate matters most.
-    c.plateIndex = GetVehicleNumberPlateTextIndex(c.entity)
-
-    local driver = GetPedInVehicleSeat(c.entity, -1)
-    c.isPlayer = driver ~= 0 and IsPedAPlayer(driver)
-    return c
-end
-
 --- Line of sight, checked only for a candidate about to be displayed.
+---
+--- Cached briefly, because this is a raycast and raycasts are the most
+--- expensive thing on this path — up to six a tick once traffic is in the
+--- cones, which is exactly when the frame budget is under pressure.
+---
+--- 250ms is chosen against what the answer is worth: a target that ducks behind
+--- a lorry is hidden for far longer than that, so nothing visibly lingers,
+--- while a target held steadily in the open stops paying for a ray it has
+--- already passed four times.
 ---@param patrolVeh number
 ---@param c table
 ---@return boolean
 function HasSight(patrolVeh, c)
-    return HasEntityClearLosToEntity(patrolVeh, c.entity, 17)
+    local entity = c.entity
+    local now = GetGameTimer()
+
+    local hit = losCache[entity]
+    if hit and (now - hit.at) < LOS_TTL then return hit.ok end
+
+    local ok = HasEntityClearLosToEntity(patrolVeh, entity, 17)
+    if hit then
+        hit.ok, hit.at = ok, now
+    else
+        losCache[entity] = { ok = ok, at = now }
+    end
+    return ok
+end
+
+--- Plate text and driver for a candidate that won a window.
+---
+--- Cached per entity: a vehicle's plate does not change, and whether a real
+--- player is driving changes rarely enough that a second is nothing. Without
+--- this the winning target paid three natives every tick to be told the same
+--- thing it was told a tenth of a second earlier.
+--- Fill in the fields skipped during the sweep.
+---@param c table
+function ResolveCandidate(c)
+    if c.resolved then return c end
+    c.resolved = true
+
+    local entity = c.entity
+    local now = GetGameTimer()
+    local info = infoCache[entity]
+
+    if not info or (now - info.at) >= INFO_TTL then
+        local driver = GetPedInVehicleSeat(entity, -1)
+        info = {
+            plate    = GetCleanPlate(entity),
+            index    = GetVehicleNumberPlateTextIndex(entity),
+            isPlayer = driver ~= 0 and IsPedAPlayer(driver),
+            at       = now,
+        }
+        infoCache[entity] = info
+    end
+
+    c.plate      = info.plate
+    c.plateIndex = info.index
+    c.isPlayer   = info.isPlayer
+    return c
 end
