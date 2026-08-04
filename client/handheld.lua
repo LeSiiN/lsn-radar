@@ -238,6 +238,7 @@ end
 local function clearReading()
     local h = HandheldState
     h.entity, h.speed, h.plate, h.index, h.dir, h.dist = nil, nil, nil, nil, nil, nil
+    h.model = nil
     h.hits, h.severity, h.checked = nil, nil, false
     h.flagged, h.reason = false, nil
 end
@@ -258,7 +259,7 @@ local function toggleLock()
     if not h.speed then return end
 
     h.lock = {
-        speed = h.speed, plate = h.plate, index = h.index,
+        speed = h.speed, plate = h.plate, index = h.index, model = h.model,
         dir = h.dir, dist = h.dist, at = GetGameTimer(),
     }
     RecordLock(h.lock, 'gun')
@@ -362,6 +363,7 @@ local function measure()
     h.speed  = speed
     h.plate  = plate
     h.index  = GetVehicleNumberPlateTextIndex(entity)
+    h.model  = GetVehicleName(entity)
     h.dir    = closing > 0 and 'closing' or 'away'
     h.dist   = math.floor(dist + 0.5)
     h.readAt = GetGameTimer()
@@ -383,7 +385,7 @@ local function measure()
     -- vehicle on purpose.
     if RadarState.settings.gunAutoLock and not h.lock and speed >= RadarState.settings.gunLimit then
         h.lock = {
-            speed = speed, plate = plate, index = h.index,
+            speed = speed, plate = plate, index = h.index, model = h.model,
             dir = h.dir, dist = h.dist, at = GetGameTimer(), auto = true,
         }
         RecordLock(h.lock, 'gun')

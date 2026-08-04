@@ -75,7 +75,7 @@ Config.Radar = {
         -- Only lock vehicles driven by a real player. NPC traffic speeds are a
         -- simulation artefact and locking them fills the window with numbers
         -- nobody can be stopped for.
-        PlayersOnly = true,
+        PlayersOnly = false,
 
         Default = { mph = 80,  kmh = 130 },
         Min     = { mph = 20,  kmh = 30  },
@@ -278,6 +278,8 @@ Config.Handheld = {
     -- The weapon stays as the trigger but is made invisible, and this model is
     -- attached to the hand in its place.
     --
+    -- Keeping the weapon is what preserves aiming: without one there is no
+    -- ADS, no crosshair and no trigger, and the whole aim-and-lock interaction
     -- would have to be rebuilt out of keypresses. Hiding it costs one native.
     --
     -- The model is streamed by whichever resource owns it — bzzz_pdradar for
@@ -362,6 +364,23 @@ Config.Audio = {
     -- PlaySoundFrontend takes no gain parameter, so a slider would have been a
     -- mute switch wearing a percentage. It is a mute switch, and says so.
     DefaultOn = true,
+
+    -- Power-on sequence. There is no switch for the self test itself, but the
+    -- tones live here with the others because this is where a server owner
+    -- looks to change what the radar sounds like.
+    --
+    -- Every one of these is a stock GTA frontend sound, so nothing has to be
+    -- streamed. The trade is that pitch cannot be controlled — a real unit
+    -- sweeps a tone upward on boot and this cannot, so the sequence is built
+    -- from distinct events instead: a switch-on, a run of ticks while the
+    -- digits roll, an acknowledgement per antenna, and a chime when it goes
+    -- live.
+    BootStart = { name = 'Beep_White',        set = 'DLC_HEIST_HACKING_SNAKE_SOUNDS' },
+    BootTick  = { name = 'NAV_UP_DOWN',       set = 'HUD_FRONTEND_DEFAULT_SOUNDSET' },
+    BootOk    = { name = 'Beep_Green',        set = 'DLC_HEIST_HACKING_SNAKE_SOUNDS' },
+    -- Powering down. One note, and a lower one than anything in the sequence
+    -- above, so switching off does not sound like an achievement.
+    BootStop  = { name = 'Beep_Red',          set = 'DLC_HEIST_HACKING_SNAKE_SOUNDS' },
 
     -- Native GTA sounds, same approach ps-dispatch uses for its alert tones —
     -- no custom audio files to ship, and they already sit in the player's

@@ -40,6 +40,9 @@
   function reportLine(e: HistoryEntry): string {
     const parts = [`${e.speed} ${e.unit}`];
     if (e.peak > e.speed) parts.push(`peak ${e.peak} ${e.unit}`);
+    // Model before plate: a driver can dispute eight characters, not the car
+    // they are sitting in, so it is the more useful identifier of the two.
+    if (e.model) parts.push(e.model);
     if (e.plate) parts.push(`plate ${e.plate}`);
     parts.push(`${SOURCE_LABEL[e.source] ?? e.source} antenna`);
     parts.push(`at ${e.clock}`);
@@ -126,6 +129,10 @@
             <Plate plate={e.plate} index={e.index} />
           {:else}
             <span class="rd-hist-noplate">No plate read</span>
+          {/if}
+
+          {#if e.model}
+            <span class="rd-model rd-hist-model">{e.model}</span>
           {/if}
 
           <span class="rd-hist-source">

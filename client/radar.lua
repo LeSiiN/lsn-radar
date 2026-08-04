@@ -118,6 +118,7 @@ function LockAntenna(antenna, target, source, auto)
         entity = target.entity,
         plate  = target.plate,
         index  = target.plateIndex,
+        model  = target.model,
         speed  = target.speed,
         peak   = target.speed,
         dir    = target.dir,

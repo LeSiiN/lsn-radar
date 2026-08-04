@@ -35,12 +35,20 @@ local nextId = 1
 
 -- ── Time ──────────────────────────────────────────────────────────────────
 
---- In-game clock, which is the time that belongs on a report — a server's clock
---- runs at its own rate and an officer writing up an incident dates it by what
---- the world said, not by their operating system.
+--- Wall clock, as HH:MM.
+---
+--- Real time rather than the in-game clock. The world clock runs at its own
+--- rate — often several times faster — so two readings taken a minute apart can
+--- be stamped an hour apart, and a list ordered by newest first ends up with
+--- times that jump backwards when the in-game day rolls over. Neither is
+--- something an officer can reason about.
+---
+--- GetLocalTime is the client's own clock, which is also the one they are
+--- looking at if they glance at their taskbar.
 ---@return string
-local function gameClock()
-    return ('%02d:%02d'):format(GetClockHours(), GetClockMinutes())
+local function wallClock()
+    local _, _, _, hour, minute = GetLocalTime()
+    return ('%02d:%02d'):format(hour, minute)
 end
 
 --- Unix time, for ageing entries out.
@@ -85,7 +93,7 @@ local function persist()
         local e = LockHistory[i]
         plain[i] = {
             id = e.id, speed = e.speed, peak = e.peak, unit = e.unit,
-            plate = e.plate, index = e.index, dir = e.dir,
+            plate = e.plate, index = e.index, model = e.model, dir = e.dir,
             source = e.source, auto = e.auto, clock = e.clock, epoch = e.epoch,
         }
     end
@@ -143,10 +151,11 @@ function RecordLock(lock, source)
         unit   = RadarState.unit,
         plate  = lock.plate,
         index  = lock.index,
+        model  = lock.model,
         dir    = lock.dir,
         source = source,
         auto   = lock.auto and true or false,
-        clock  = gameClock(),
+        clock  = wallClock(),
         epoch  = epochNow(),
     }
     nextId = nextId + 1
@@ -234,7 +243,7 @@ exports('GetLockHistory', function()
         local e = LockHistory[i]
         copy[i] = {
             speed = e.speed, peak = e.peak, unit = e.unit, plate = e.plate,
-            dir = e.dir, source = e.source, auto = e.auto, clock = e.clock,
+            model = e.model, dir = e.dir, source = e.source, auto = e.auto, clock = e.clock,
             epoch = e.epoch,
         }
     end

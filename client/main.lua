@@ -186,6 +186,7 @@ end
 function PushRadarToNui(force)
     local sig = table.concat({
         RadarState.power and '1' or '0',
+        RadarState.selfTest or '-',
         RadarState.patrolSpeed,
         RadarState.unit,
         antennaSignature(RadarState.antennas.front),
@@ -199,6 +200,7 @@ function PushRadarToNui(force)
         action = 'radar',
         data = {
             power       = RadarState.power,
+            selfTest    = RadarState.selfTest,
             keyLock     = RadarState.keyLock,
             unit        = RadarState.unit,
             patrolSpeed = RadarState.patrolSpeed,
@@ -291,6 +293,83 @@ end
 --- Power is not visibility: an unpowered radar still shows its housing, dark,
 --- the way it does in a real car. Switching it off entirely is what leaving
 --- the vehicle does.
+--- Power-on self test.
+---
+--- Not configurable, on purpose. A boot sequence is part of what the device is
+--- rather than a preference, and an option to skip it would only ever be set
+--- once by someone who had seen it twice — at which point the thing has no
+--- reason to exist at all. It either belongs in the product or it does not.
+---
+--- The client owns the phases and the interface owns what each one looks like.
+--- Sending a phase rather than a stream of frames keeps the display a
+--- projection of RadarState — a boot sequence only the interface knew about
+--- would be a second opinion on whether the radar is showing something real.
+---
+--- Nothing waits on any of it: the antennas sample throughout, so a vehicle
+--- measured during the test appears the instant it ends.
+--- Each phase names the sound that opens it. `ticks` runs a repeating tone
+--- underneath for the length of the phase, which is what turns the digit roll
+--- from a silent animation into something that sounds mechanical.
+local SELF_TEST = {
+    -- Every segment lit. The point of a lamp test: a dead segment turns an 8
+    -- into a 3 and nobody finds out until it matters.
+    { phase = 'lamps',    ms = 900,  sound = 'BootStart' },
+    -- Digits roll through their range, window by window.
+    { phase = 'sweep',    ms = 1500, ticks = 280 },
+    -- Each antenna reports in turn, front then rear. Two acknowledgements,
+    -- spaced to land with the interface switching between the blocks.
+    { phase = 'antennas', ms = 1200, ticks = 600, tickSound = 'BootOk' },
+}
+
+local selfTestRun = 0
+
+local function runSelfTest()
+    selfTestRun = selfTestRun + 1
+    local myRun = selfTestRun
+
+    CreateThread(function()
+        for i = 1, #SELF_TEST do
+            local step = SELF_TEST[i]
+
+            -- Abandoned if the radar was switched off, or if a second test
+            -- started — powering off and straight back on should not leave two
+            -- sequences fighting over the display.
+            if not RadarState.power or selfTestRun ~= myRun then
+                if selfTestRun == myRun then
+                    RadarState.selfTest = nil
+                    PushRadarToNui(true)
+                end
+                return
+            end
+
+            RadarState.selfTest = step.phase
+            PushRadarToNui(true)
+
+            if step.sound then PlayRadarSound(step.sound, 0) end
+
+            if step.ticks then
+                -- Ticked in place rather than on a thread of its own, so the
+                -- run check above still governs it — a sequence abandoned
+                -- halfway must not leave a tone repeating over a dark display.
+                local elapsed = 0
+                local tickName = step.tickSound or 'BootTick'
+                while elapsed < step.ms do
+                    if not RadarState.power or selfTestRun ~= myRun then break end
+                    PlayRadarSound(tickName, 0)
+                    Wait(step.ticks)
+                    elapsed = elapsed + step.ticks
+                end
+            else
+                Wait(step.ms)
+            end
+        end
+
+        if selfTestRun ~= myRun then return end
+        RadarState.selfTest = nil
+        PushRadarToNui(true)
+    end)
+end
+
 function ToggleRadarPower()
     RadarState.power = not RadarState.power
     PlateState.power = RadarState.power and Config.PlateReader.Enabled
@@ -306,11 +385,23 @@ function ToggleRadarPower()
         end
     end
 
+    if RadarState.power then
+        runSelfTest()
+    else
+        PlayRadarSound('BootStop', 0)
+        -- Bumped so a test still running abandons itself rather than finishing
+        -- its sequence on a radar that is now dark.
+        selfTestRun = selfTestRun + 1
+        RadarState.selfTest = nil
+    end
+
     -- Remember the choice for the next vehicle.
     RadarState.settings.autoPower = RadarState.power
     persist()
 
-    PlayRadarSound('Alert', 200)
+    -- No generic Alert tone here any more: powering on opens with BootStart and
+    -- powering off plays BootStop, so a third sound on the same action was one
+    -- too many.
     PushRadarToNui(true)
     PushPlatesToNui()
 end
@@ -355,6 +446,7 @@ CreateThread(function()
             if RadarState.settings.autoPower and not RadarState.power then
                 RadarState.power = true
                 PlateState.power = Config.PlateReader.Enabled
+                runSelfTest()
                 PushRadarToNui(true)
                 PushPlatesToNui()
             end

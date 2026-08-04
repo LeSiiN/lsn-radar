@@ -906,3 +906,82 @@ html, body {
     max-width: 210px;
     line-height: 1.45;
 }
+
+/* Vehicle model beside the plate. Truncates rather than wraps: the row height
+   is fixed, and a long addon name must not be able to change it. */
+.rd-model {
+    flex: 1;
+    min-width: 0;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.42);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* In the log the model sits beside the plate rather than after it, so a row
+   without a plate still reads as being about a specific vehicle. */
+.rd-hist-model { flex: 0 1 auto; max-width: 120px; }
+
+/* ── Power-on self test ─────────────────────────────────────────────────────
+   A boot sequence rather than a blink. Four phases: every segment lit, digits
+   rolling, each antenna reporting in turn, then zeroed and steady. */
+.rd-panel--boot {
+    border-color: rgba(56, 189, 248, 0.28);
+    animation: rdBootGlow 1.1s ease-in-out infinite;
+}
+@keyframes rdBootGlow {
+    0%, 100% { box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65); }
+    50%      { box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65), 0 0 22px -6px rgba(56, 189, 248, 0.5); }
+}
+
+.rd-boot-tag {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: rgba(125, 211, 252, 0.85);
+    animation: rdBootBlink 0.9s steps(2, end) infinite;
+}
+@keyframes rdBootBlink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+}
+
+/* Status line where the plate row sits. A scan line runs across it, which is
+   the one place a little theatre is free: the row is otherwise empty during
+   the test. */
+.rd-boot-line {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    font-family: "Courier New", monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    color: rgba(125, 211, 252, 0.75);
+    white-space: nowrap;
+}
+.rd-boot-line--done { color: rgba(74, 222, 128, 0.9); }
+.rd-boot-line::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(125, 211, 252, 0.22) 45%,
+        rgba(125, 211, 252, 0.35) 50%,
+        rgba(125, 211, 252, 0.22) 55%,
+        transparent 100%
+    );
+    transform: translateX(-100%);
+    animation: rdBootScan 1.3s linear infinite;
+}
+@keyframes rdBootScan {
+    to { transform: translateX(100%); }
+}
+
+.rd-dot--test {
+    background: #4ade80;
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.8);
+}

@@ -76,6 +76,10 @@
             {#if reading?.plate}
               <Plate plate={reading.plate} index={reading.index} />
 
+              {#if reading?.model && !h.flagged && !h.checked}
+                <span class="rd-model">{reading.model}</span>
+              {/if}
+
               <div class="rd-plate-meta">
                 {#if watchHit}
                   <span class="rd-badge rd-badge--red rd-hit"><i class="fas fa-eye"></i></span>

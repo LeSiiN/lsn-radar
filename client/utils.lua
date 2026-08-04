@@ -136,6 +136,53 @@ function GetCleanPlate(veh)
     return (plate:gsub('^%s+', ''):gsub('%s+$', ''))
 end
 
+--- Readable name for a vehicle, e.g. "Karin Sultan".
+---
+--- Keyed by model hash rather than by entity: two Sultans share an answer, and
+--- the answer never changes. That makes the lookup free after the first car of
+--- each type, which matters because it runs on a resolved candidate every tick.
+---
+--- The label lookup can fail on addon vehicles whose text entries were never
+--- registered, in which case GetLabelText hands back the key it was given. That
+--- is a poor thing to print, so the raw display name is used instead — ugly but
+--- true, which is the right side to err on for something that ends up in a
+--- report.
+---@param veh number
+---@return string
+local modelNames = {}
+function GetVehicleName(veh)
+    local model = GetEntityModel(veh)
+    local cached = modelNames[model]
+    if cached then return cached end
+
+    local display = GetDisplayNameFromVehicleModel(model)
+    local name = GetLabelText(display)
+
+    -- A registered label is already presented properly ("Sultan"), so it is
+    -- left alone. Only the fallback needs case work, because the raw display
+    -- name is shouted ("SULTAN").
+    --
+    -- Applying title case to everything looked tidier and was worse: it would
+    -- have turned "BMX" into "Bmx" and "RS4" into "Rs4", mangling exactly the
+    -- names that were already correct.
+    if not name or name == '' or name == 'NULL' then
+        name = display:gsub("(%a)([%w']*)", function(first, rest)
+            return first:upper() .. rest:lower()
+        end)
+    end
+
+    local makeKey = GetMakeNameFromVehicleModel and GetMakeNameFromVehicleModel(model)
+    if makeKey and makeKey ~= '' then
+        local make = GetLabelText(makeKey)
+        if make and make ~= '' and make ~= 'NULL' and make ~= name then
+            name = make .. ' ' .. name
+        end
+    end
+
+    modelNames[model] = name
+    return name
+end
+
 -- ── Audio ─────────────────────────────────────────────────────────────────
 
 local lastSoundAt = {}

@@ -3,6 +3,7 @@
   import Segment from "@components/Segment.svelte";
   import { draggable } from "@actions/draggable";
   import { RADAR, PLATES, CONFIG, REMOTE_OPEN } from "@store/stores";
+  import { onDestroy } from "svelte";
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
 
@@ -11,6 +12,27 @@
   $: powered = $RADAR.power;
   $: showPlate = $CONFIG.settings.showPlate && $PLATES.enabled;
   $: watchCount = $PLATES.watch?.length ?? 0;
+  $: booting = !!$RADAR.selfTest;
+
+  // Which antenna the `antennas` phase is on. Stepped here rather than sent
+  // from the client: it is a detail of how the phase looks, and pushing a
+  // message per antenna would put two NUI round trips inside an animation for
+  // no gain in truth.
+  let antennaStep = 0;
+  let stepTimer: ReturnType<typeof setInterval> | undefined;
+
+  $: if ($RADAR.selfTest === "antennas") {
+    if (!stepTimer) {
+      antennaStep = 0;
+      stepTimer = setInterval(() => (antennaStep = antennaStep === 0 ? 1 : 0), 600);
+    }
+  } else if (stepTimer) {
+    clearInterval(stepTimer);
+    stepTimer = undefined;
+    antennaStep = 0;
+  }
+
+  onDestroy(() => stepTimer && clearInterval(stepTimer));
 
   // A switched-off radar is not on screen at all. It stays visible while the
   // control panel is open, though — that is where it gets switched back on, and
@@ -36,7 +58,7 @@
        anchor keeps its unscaled layout box, so an outline drawn there traced a
        rectangle the size the panel used to be. -->
   <div class="rd-scaler" class:rd-drag-armed={$REMOTE_OPEN} style="transform:scale({scale})">
-    <div class="rd-panel" class:rd-panel--off={!powered}>
+    <div class="rd-panel" class:rd-panel--off={!powered} class:rd-panel--boot={booting}>
       <div class="rd-head">
         <div class="rd-icon" class:rd-icon--off={!powered}>
           <i class="fas fa-satellite-dish"></i>
@@ -58,14 +80,18 @@
         <!-- Patrol speed is context for every reading below it, not a fourth
              target, so it sits in the header rather than in a window. -->
         <div class="rd-sub rd-patrol">
-          <Segment value={powered ? $RADAR.patrolSpeed : null} size="sm" state={powered ? "patrol" : "idle"} />
-          <span>{$RADAR.unit}</span>
+          {#if booting}
+            <span class="rd-boot-tag">SELF TEST</span>
+          {:else}
+            <Segment value={powered ? $RADAR.patrolSpeed : null} size="sm" state={powered ? "patrol" : "idle"} />
+            <span>{$RADAR.unit}</span>
+          {/if}
         </div>
       </div>
 
       <div class="rd-body">
-        <Antenna cam="front" data={$RADAR.front} camera={$PLATES.front} {powered} {showPlate} />
-        <Antenna cam="rear" data={$RADAR.rear} camera={$PLATES.rear} {powered} {showPlate} />
+        <Antenna cam="front" data={$RADAR.front} camera={$PLATES.front} {powered} {showPlate} selfTest={$RADAR.selfTest} {antennaStep} />
+        <Antenna cam="rear" data={$RADAR.rear} camera={$PLATES.rear} {powered} {showPlate} selfTest={$RADAR.selfTest} {antennaStep} />
       </div>
     </div>
   </div>

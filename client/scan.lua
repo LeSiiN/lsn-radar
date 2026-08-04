@@ -378,6 +378,7 @@ function ResolveCandidate(c)
         info = {
             plate    = GetCleanPlate(entity),
             index    = GetVehicleNumberPlateTextIndex(entity),
+            model    = GetVehicleName(entity),
             isPlayer = driver ~= 0 and IsPedAPlayer(driver),
             at       = now,
         }
@@ -386,6 +387,7 @@ function ResolveCandidate(c)
 
     c.plate      = info.plate
     c.plateIndex = info.index
+    c.model      = info.model
     c.isPlayer   = info.isPlayer
     return c
 end

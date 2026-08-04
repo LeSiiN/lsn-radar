@@ -6,6 +6,7 @@ export type Direction = "closing" | "away";
 export interface Target {
   speed: number;
   dir: Direction;
+  model?: string | null;
   /** Which vehicle the reading came from, so HOLD can freeze its plate too. */
   entity?: number;
   plate?: string | null;
@@ -18,6 +19,8 @@ export interface Lock extends Target {
   at: number;
   /** Plate of the tracked vehicle, for identifying which car was measured. */
   plate?: string | null;
+  /** Readable vehicle name, e.g. "Karin Sultan". */
+  model?: string | null;
   /** Highest speed seen since the lock was taken. */
   peak?: number;
   /** True when the tracked vehicle is out of range or gone. */
@@ -34,6 +37,8 @@ export interface Antenna {
 
 export interface RadarData {
   power: boolean;
+  /** Power-on lamp test: every segment lit, then blank, then live. */
+  selfTest?: "lamps" | "sweep" | "antennas" | "ready" | null;
   keyLock: boolean;
   unit: Unit;
   patrolSpeed: number;
@@ -51,6 +56,7 @@ export interface Hit {
 export interface Camera {
   plate: string;
   index?: number | null;
+  model?: string | null;
   locked: boolean;
   /** Held because the antenna on this side locked the vehicle. */
   pinned?: boolean;
@@ -79,12 +85,14 @@ export interface HandheldData {
   speed?: number | null;
   plate?: string | null;
   index?: number | null;
+  model?: string | null;
   dir?: Direction | null;
   dist?: number | null;
   lock?: {
     speed: number;
     plate?: string | null;
     index?: number | null;
+    model?: string | null;
     dir?: Direction | null;
     dist?: number | null;
     at: number;
@@ -103,6 +111,7 @@ export interface HistoryEntry {
   unit: Unit;
   plate?: string | null;
   index?: number | null;
+  model?: string | null;
   dir?: Direction | null;
   /** Which device took it: an antenna, or the handheld unit. */
   source: "front" | "rear" | "gun";

@@ -8,6 +8,9 @@
   export let data: Antenna;
   export let camera: Camera | null = null;
   export let powered: boolean = false;
+  export let selfTest: "lamps" | "sweep" | "antennas" | "ready" | null = null;
+  /** Which antenna the `antennas` phase is currently on. */
+  export let antennaStep: number = 0;
   export let showPlate: boolean = true;
 
   // One block per side, carrying everything that side knows: the antenna that
@@ -22,6 +25,40 @@
   $: held = powered && !data.xmit;
   $: locked = powered && !!data.lock;
   $: readingState = (held ? "hold" : "live") as "hold" | "live";
+
+  // The self test overrides every window at once. Computed here rather than
+  // per window so the three cannot disagree about which phase is running.
+  //
+  // `antennas` walks the two blocks in turn, so each one has to know whether
+  // its own turn has come — front first, because that is the order they are
+  // listed in and the order an operator reads them.
+  $: testing = selfTest === "lamps";
+  $: rolling = selfTest === "sweep";
+  $: marching = selfTest === "antennas";
+  $: myTurn = marching && (cam === "front" ? antennaStep === 0 : antennaStep === 1);
+  $: zeroed = selfTest === "ready";
+  $: booting = !!selfTest;
+
+  // Computed here rather than with {@const} in the markup: that directive is
+  // only allowed as the immediate child of a block construct, and these sit
+  // inside plain divs.
+  type Win = {
+    value: number | null;
+    state: "idle" | "live" | "hold" | "lock" | "test" | "roll";
+  };
+
+  function win(value: number | null | undefined, live: "live" | "hold" | "lock"): Win {
+    if (testing) return { value: null, state: "test" };
+    if (rolling) return { value: null, state: "roll" };
+    if (marching) return myTurn ? { value: null, state: "test" } : { value: null, state: "idle" };
+    if (zeroed) return { value: 0, state: "live" };
+    if (value == null) return { value: null, state: "idle" };
+    return { value, state: live };
+  }
+
+  $: strongWin = win(powered ? data.strong?.speed : null, readingState);
+  $: fastWin = win(powered ? data.fast?.speed : null, readingState);
+  $: lockWin = win(locked ? data.lock?.speed : null, "lock");
   $: showPeak = locked && !!data.lock?.peak && (data.lock?.peak ?? 0) > (data.lock?.speed ?? 0);
 
   // A pinned camera is being held because this antenna locked the vehicle, so
@@ -67,10 +104,20 @@
   class:rd-ant--flagged={camera?.flagged}
 >
   <div class="rd-ant-head">
-    <span class="rd-dot" class:rd-dot--xmit={powered && data.xmit} class:rd-dot--hold={held}></span>
+    <span
+      class="rd-dot"
+      class:rd-dot--xmit={(powered && data.xmit) || (booting && !marching)}
+      class:rd-dot--hold={held}
+      class:rd-dot--test={myTurn}
+    ></span>
     <span class="rd-ant-name">{cam}</span>
 
-    {#if locked}
+    {#if booting}
+      <span class="rd-badge" class:rd-badge--green={myTurn} class:rd-badge--blue={!myTurn}>
+        {myTurn ? "OK" : "TEST"}
+      </span>
+      <span class="rd-ant-mode">&nbsp;</span>
+    {:else if locked}
       <span class="rd-badge rd-badge--red">LOCK</span>
       <span class="rd-ant-mode rd-track" class:rd-stale={data.lock?.lost}>
         {data.lock?.lost ? "\u26A0" : "\u25CF"}
@@ -97,11 +144,7 @@
           {arrow(data.strong?.dir)}
         </span>
       </span>
-      <Segment
-        value={powered && data.strong ? data.strong.speed : null}
-        size="lg"
-        state={powered && data.strong ? readingState : "idle"}
-      />
+      <Segment value={strongWin.value} size="lg" state={strongWin.state} rollDelay={0} />
     </div>
 
     <div class="rd-win">
@@ -111,11 +154,7 @@
           {arrow(data.fast?.dir)}
         </span>
       </span>
-      <Segment
-        value={powered && data.fast ? data.fast.speed : null}
-        size="md"
-        state={powered && data.fast ? readingState : "idle"}
-      />
+      <Segment value={fastWin.value} size="md" state={fastWin.state} rollDelay={1} />
     </div>
 
     <div class="rd-win">
@@ -123,17 +162,20 @@
         {#if showPeak}Peak {data.lock?.peak}{:else}Lock{/if}
         <span class="rd-dir" style:visibility={locked && data.lock?.auto ? "visible" : "hidden"}>A</span>
       </span>
-      <Segment
-        value={locked ? data.lock?.speed ?? null : null}
-        size="md"
-        state={locked ? "lock" : "idle"}
-      />
+      <Segment value={lockWin.value} size="md" state={lockWin.state} rollDelay={2} />
     </div>
   </div>
 
   {#if showPlate}
     <div class="rd-plate-row" class:rd-plate-row--pinned={pinned} class:rd-plate-row--copied={!!copied}>
-      {#if copied}
+      {#if booting}
+        <span class="rd-boot-line" class:rd-boot-line--done={zeroed}>
+          {#if testing}LAMP TEST
+          {:else if rolling}CALIBRATING
+          {:else if marching}{myTurn ? "ANTENNA OK" : "STANDBY"}
+          {:else}READY{/if}
+        </span>
+      {:else if copied}
         <span class="rd-copied">
           <i class="fas fa-clipboard-check"></i>
           <span class="rd-copied-label">Copied</span>
