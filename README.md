@@ -28,6 +28,17 @@ The implementation, interface and integrations are new.
 
 ---
 
+## Preview
+
+<img src="https://r2.fivemanage.com/image/aQTxYJ0wm59X.png" width="450">
+<img src="https://r2.fivemanage.com/image/237PqcXXdDD1.jpg" width="450">
+<img src="https://r2.fivemanage.com/image/zcVFPK2V2Cam.png" width="450">
+<img src="https://r2.fivemanage.com/image/sRQ2RMgJ4aA1.png" width="450">
+<img src="https://r2.fivemanage.com/image/mnjvn9BdRihb.png" width="450">
+<img src="https://r2.fivemanage.com/image/VshJLRo5Apit.png" width="450">
+<img src="https://r2.fivemanage.com/image/fIToS6JSlg4N.png" width="450">
+<img src="https://r2.fivemanage.com/image/zvN6IyvfW1P2.jpg" width="450">
+
 ## What it does
 
 **Mounted radar** — two antennas, front and rear. Each reports a STRONG and a
