@@ -472,10 +472,50 @@ exports['lsn-radar']:GetWatchPlates()
 exports['lsn-radar']:LockCamera('front', true)
 exports['lsn-radar']:GetPlates()        -- { front, rear, watch }
 exports['lsn-radar']:GetLockedSpeeds()  -- { unit, front, rear }
+
+exports['lsn-radar']:GetLastSpeed()       -- newest reading, any device
+exports['lsn-radar']:GetLastSpeed('gun')  -- 'front' | 'rear' | 'gun'
+exports['lsn-radar']:GetLockHistory()     -- everything, newest first
 ```
 
-`GetLockedSpeeds` exists for citation forms that would rather not ask an officer
-to retype a number the radar already knows.
+These exist for citation forms that would rather not ask an officer to retype a
+number the radar already knows. `GetLastSpeed` returns `nil` when nothing has
+been locked — not a zero, so a form can tell "no reading" from "stationary" —
+and otherwise:
+
+```lua
+{
+  speed  = 88,          -- at the instant of the lock
+  peak   = 95,          -- highest while the lock held; the number for the ticket
+  unit   = 'mph',       -- the unit it was MEASURED in, not the current setting
+  plate  = '46EEK872',
+  index  = 3,
+  model  = 'Sultan',
+  dir    = 'closing',   -- 'closing' | 'away'
+  source = 'gun',       -- 'front' | 'rear' | 'gun'
+  auto   = false,       -- taken by fast-lock / auto-lock rather than the trigger
+  clock  = '14:32',
+  epoch  = 1757500000,
+  age    = 41,          -- seconds since the lock
+  live   = true,        -- lock still held, so `peak` may still climb
+}
+```
+
+Two of those are worth reading twice. **`peak`, not `speed`**, is what goes on a
+citation: on a tracking lock the vehicle keeps climbing after the trigger, and
+`speed` is only the first tenth of a second of it. And **`unit` belongs to the
+reading**, not to the display — switching between mph and km/h does not convert
+locks already taken, so a form that labels an old number with the current
+setting relabels it without converting it.
+
+`live = true` means the lock has not been released and `peak` is still moving. A
+form that stores the number and closes is storing an interim reading; one that
+stays open should ask again when it is submitted.
+
+With `Config.Radar.LockHistory.Enabled = false` the export falls back to the
+locks currently held on the devices, so it keeps working — but only for as long
+as the officer holds a lock, and `clock`, `epoch` and `age` come back `nil`
+because nothing was written down.
 
 ### Server
 

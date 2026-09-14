@@ -249,3 +249,119 @@ exports('GetLockHistory', function()
     end
     return copy
 end)
+
+--- Shape a history entry into what a caller gets back.
+---
+--- `unit` comes from the entry, not from `RadarState.unit`. Switching the
+--- display between mph and km/h does not convert readings already taken — the
+--- entry keeps the unit it was measured in — so reporting the current setting
+--- would relabel an old number without changing it, which is the one failure
+--- mode a citation cannot survive.
+---@param e table
+---@param live boolean
+---@return table
+local function shapeEntry(e, live)
+    return {
+        speed  = e.speed,
+        peak   = e.peak or e.speed,
+        unit   = e.unit,
+        plate  = e.plate,
+        index  = e.index,
+        model  = e.model,
+        dir    = e.dir,
+        source = e.source,
+        auto   = e.auto and true or false,
+        clock  = e.clock,
+        epoch  = e.epoch,
+        age    = e.epoch and (epochNow() - e.epoch) or nil,
+        live   = live and true or false,
+    }
+end
+
+--- The newest lock still held on a device, for when the history is switched off.
+---
+--- Only ever the current lock per device: without the history there is nothing
+--- holding a reading once the officer releases it. That is the cost of turning
+--- the history off, and it is why this is a fallback rather than the path.
+---@param source string|nil
+---@return table|nil
+local function lastLiveLock(source)
+    local best, bestSource
+
+    local function consider(lock, name)
+        if not lock or not lock.speed then return end
+        if source and source ~= name then return end
+        -- `at` is GetGameTimer, so this only orders locks from one session —
+        -- which is all three of these can ever be.
+        if not best or (lock.at or 0) > (best.at or 0) then
+            best, bestSource = lock, name
+        end
+    end
+
+    local antennas = RadarState and RadarState.antennas
+    if antennas then
+        consider(antennas.front and antennas.front.lock, 'front')
+        consider(antennas.rear and antennas.rear.lock, 'rear')
+    end
+    consider(HandheldState and HandheldState.lock, 'gun')
+
+    if not best then return nil end
+
+    return {
+        speed  = best.speed,
+        peak   = best.peak or best.speed,
+        unit   = RadarState.unit,
+        plate  = best.plate,
+        index  = best.index,
+        model  = best.model,
+        dir    = best.dir,
+        source = bestSource,
+        auto   = best.auto and true or false,
+        -- No clock, epoch or age: those are stamped when an entry is written,
+        -- and nothing was written.
+        live   = true,
+    }
+end
+
+--- The last speed this officer locked.
+---
+--- `GetLockHistory` already returns this as its first element, but reaching
+--- into index 1 requires the caller to know the list is ordered newest first.
+--- That is a rule which holds right up until someone sorts the copy they were
+--- given, and then a citation quietly carries the wrong number.
+---
+--- Narrow it to one device when the form knows which one it is asking about: a
+--- handheld citation should not offer the number the patrol antenna caught
+--- while the car was parked two streets away.
+---
+--- `peak` is the number to put on the ticket, not `speed`. `speed` is what the
+--- vehicle read at the instant of the lock; `peak` is the highest it reached
+--- while the lock held. On a tracking lock those are different, and the second
+--- is the one that was measured.
+---
+--- Returns nil when nothing has been locked, rather than a zero — a form has to
+--- be able to tell "no reading" from "stationary".
+---
+---@param source string|nil 'front' | 'rear' | 'gun'; omit for whichever is newest
+---@return table|nil reading
+exports('GetLastSpeed', function(source)
+    if source ~= nil and source ~= 'front' and source ~= 'rear' and source ~= 'gun' then
+        return nil
+    end
+
+    for i = 1, #LockHistory do
+        local e = LockHistory[i]
+        if not source or e.source == source then
+            -- `live` means the lock is still held, so `peak` may still climb.
+            -- A form that stores this number and closes is storing an interim
+            -- reading; one that stays open should ask again on submit.
+            return shapeEntry(e, liveEntries[e] ~= nil)
+        end
+    end
+
+    -- Nothing in the history. Either nothing has been locked this session, or
+    -- Config.Radar.LockHistory.Enabled is false — and an export that returns
+    -- nothing because of a config flag nobody remembers setting is a worse
+    -- outcome than three table lookups.
+    return lastLiveLock(source)
+end)
